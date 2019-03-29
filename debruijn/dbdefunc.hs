@@ -5,18 +5,18 @@ import Test.QuickCheck
 
 data Nat = Z | S Nat deriving (Eq)
 
-data Ctx = CtxEmpty | CtxCons Ctx CrucibleType deriving (Eq)
+data Ctx = CtxEmpty | CtxCons Ctx Ty deriving (Eq)
 
-data CrucibleType = BaseType | VarType Nat | FnType Ctx CrucibleType
-  | PolyFnType Nat Ctx CrucibleType deriving (Eq,Show)
+data Ty = BaseType | VarType Nat | FnType Ctx Ty
+  | PolyFnType Nat Ctx Ty deriving (Eq,Show)
 
 data Renaming = Succ | Lift Renaming deriving (Eq,Show)
 
-data Sub = IdSub | ConsSub CrucibleType Sub | LiftSub Sub | TailSub Sub | SuccSub
+data Sub = IdSub | ConsSub Ty Sub | LiftSub Sub | TailSub Sub | SuccSub
   deriving (Eq, Show)
 
 ----------------------------------------------------------
-ctxToList :: Ctx -> [CrucibleType]
+ctxToList :: Ctx -> [Ty]
 ctxToList CtxEmpty = []
 ctxToList (CtxCons c ct) = ct : ctxToList c
 instance Show Ctx where
@@ -50,20 +50,20 @@ instance Arbitrary Nat where
   shrink Z = []
   shrink (S n) = [n]
 
-fl :: [CrucibleType] -> Ctx
+fl :: [Ty] -> Ctx
 fl [] = CtxEmpty
 fl (x:xs) = CtxCons (fl xs) x
 
 instance Arbitrary Ctx where
   arbitrary = fl <$> arbitrary
 
-instance Arbitrary CrucibleType where
+instance Arbitrary Ty where
   arbitrary = sized (gt Z) where
     base n = oneof (return BaseType : [return (VarType k) | k <- upto (fi 5) ])
     gl :: Nat -> Int -> Gen Ctx
     gl n m = (gt n m) >>= \ty -> return (CtxCons CtxEmpty ty)
     
-    gt :: Nat -> Int -> Gen CrucibleType
+    gt :: Nat -> Int -> Gen Ty
     gt n m =
       if m <= 1 then base n
       else
@@ -115,7 +115,7 @@ applyr (Lift r) = \n -> case n of
 repeat a Z x = x
 repeat a (S n) x = a (repeat a n x)
                           
-rename :: Renaming -> CrucibleType -> CrucibleType
+rename :: Renaming -> Ty -> Ty
 rename r BaseType = BaseType
 rename r (VarType k)= VarType (applyr r k)
 rename r (FnType args ret) =
@@ -126,7 +126,7 @@ rename r (PolyFnType k args ret) =
 renameCtx r CtxEmpty = CtxEmpty
 renameCtx r (CtxCons ctx' ty) = CtxCons (renameCtx r ctx') (rename r ty)
 
-applys :: Sub -> Nat -> CrucibleType
+applys :: Sub -> Nat -> Ty
 applys IdSub = \x -> VarType x
 applys (ConsSub e s) = \x -> case x of
   Z -> e
@@ -137,7 +137,7 @@ applys (LiftSub s) = \x -> case x of
 applys (TailSub s) = \x -> applys s (S x)
 applys SuccSub = \x -> VarType (S x)
 
-subst :: Sub -> CrucibleType -> CrucibleType
+subst :: Sub -> Ty -> Ty
 subst s BaseType = BaseType
 subst s (VarType k) = applys s k
 subst s (FnType a r) = FnType (substCtx s a) (subst s r)
@@ -161,7 +161,7 @@ prop_repeat_repeat :: Nat -> Nat -> Renaming -> Bool
 prop_repeat_repeat n n0 x = 
   repeat Lift n (repeat Lift n0 x) == repeat Lift (plus n n0) x
 
-prop_tail_sub_compose :: Sub -> CrucibleType -> Bool
+prop_tail_sub_compose :: Sub -> Ty -> Bool
 prop_tail_sub_compose s1 x =
   subst (TailSub s1) x == subst s1 (rename Succ x)
 

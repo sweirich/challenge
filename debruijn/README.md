@@ -16,3 +16,5 @@ Furthermore, I need to be able to implement n-ary substitutions.
 So the challenge is to prove that my definition of composeSub is actually 
 substitution composition. See the last lemma in the file.
 
+[Maybe useful reference](https://dl.acm.org/citation.cfm?id=2693163)
+

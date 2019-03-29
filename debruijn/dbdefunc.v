@@ -990,6 +990,53 @@ Qed.
 (*---------------------------------------------------- *)
 (** CHALLENGE lemma *)
 
+Lemma ugh: 
+ (forall ctx (n : nat) s1 s2,
+  (subst (composeSub s1 s2) ctx = subst s1 (subst s2 ctx)) ->
+  subst (repeat LiftSub n (composeSub s1 s2)) ctx = subst (repeat LiftSub n s1) (subst (repeat LiftSub n s2) ctx)) /\
+ (forall ctx (n : nat) s1 s2,
+  (substCtx (composeSub s1 s2) ctx = substCtx s1 (substCtx s2 ctx)) ->
+  substCtx (repeat LiftSub n (composeSub s1 s2)) ctx = substCtx (repeat LiftSub n s1) (substCtx (repeat LiftSub n s2) ctx)).
+Proof.
+  eapply both.
+  all: try solve [intros; simpl; auto].
+  all: try solve
+    [intros; simpl in *; inversion H1; rewrite H; auto; rewrite H0; auto].
+  - intros. simpl in *.
+    clear H.
+    move: n0 n s1 s2.
+    induction n0. intros; simpl; auto.
+    rewrite ApplyScS. auto.
+    intros n. simpl. destruct n. simpl. auto.
+    move=> s1 s2.
+    rewrite IHn0. 
+Lemma foo: 
+  (forall t s n, rename (repeat Lift n Succ) (subst s t) = 
+          subst (LiftSub s) (rename (repeat Lift n Succ) t)) /\
+  (forall t s n, renameCtx (repeat Lift n Succ) (substCtx s t) = 
+          substCtx (LiftSub s) (renameCtx (repeat Lift n Succ) t)).
+Proof. 
+  eapply both.
+  all: try solve [intros; simpl; auto].
+  all: try solve
+    [intros; simpl in *;  rewrite H; auto; rewrite H0; auto].
+  - simpl.
+    admit.
+  - intros. 
+    simpl.
+    f_equal.
+    replace (repeat Lift n (repeat Lift n0 Succ)) with 
+            (repeat Lift (n + n0) Succ).
+    rewrite H.
+    
+    replace (LiftSub (repeat LiftSub n0 s1)) with (repeat LiftSub n0 (LiftSub s1)).
+
+
+    replace (LiftSub (repeat LiftSub n0 s2)) with (repeat LiftSub n0 (LiftSub s2)).
+    rewrite <- IHn0.
+rewrite IHn0.
+SearchAbout rename Succ.    
+
 Lemma compose_lemma : 
   (forall x s1 s2, subst (composeSub s1 s2) x = subst s1 (subst s2 x)) /\
   (forall x s1 s2, substCtx (composeSub s1 s2) x = substCtx s1 (substCtx s2 x)).
@@ -1003,6 +1050,8 @@ Proof.
   - intros n ctx h0 ty h1 s1 s2.
     simpl.
     f_equal.
+    move: n ctx h0.
+
 Abort.    
 
 

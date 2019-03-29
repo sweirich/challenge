@@ -1,0 +1,16 @@
+*.agdai
+*.hi
+*.o
+dist/
+dist-newstyle/
+*/.stack-work
+*/~$*
+*.pdf
+*~
+*.tex
+*.bbl
+.ghc.environment.*
+*.aux
+*.log
+*.out
+*.ptb

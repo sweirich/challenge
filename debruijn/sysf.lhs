@@ -1,3 +1,4 @@
+
 \documentclass[sigplan,10pt,review,anonymous]{acmart}
 \settopmatter{printfolios=true,printccs=false,printacmref=false}
 
@@ -92,14 +93,18 @@ Text of abstract \ldots.
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE IncoherentInstances #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilyDependencies #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -117,13 +122,30 @@ import Data.Singletons.TH
 import Data.Kind(Type)
 
 import Data.Type.Equality
-
-import Unsafe.Coerce
 \end{code}
 %endif
 
+Let's get this out of the way early:
+\begin{code}
+import Unsafe.Coerce
+\end{code}
+
+This paper is a literate Haskell example of a strongly-typed representation of
+System F. In other words, the datatype only includes well typed System F
+terms.
+
+Although strongly-typed ASTs are common examples for programming with GADTs,
+this paper goes a bit further. On one hand, it uses a deep embedding types ---
+our AST will be indexed by members of a Haskell datatype, called |Ty| instead
+of actual Haskell types (of kind |Type|), the usual shallow embedding of
+types.
+
+Furthermore, this representation includes polymorphic types, which is an
+uncommon example for a strongly-typed embedding.
+
+
 We will use deBruijn indices, with parallel substitutions to
-represent type variables in System F. 
+represent type variables in System F.
 
 Why are we doing this:
 \begin{enumerate}
@@ -160,6 +182,20 @@ Yes: earlier bug finding, tighter interface
 No: it's all statically checked anyways, less support from singletons
     needs TypeInType, more proofs required
 
+
+Question: Why use parallel substitutions vs. "standard DB"? Is one
+easier to understand than the other? How do they compare?
+
+Other issues: de Bruijn indices are terrible for efficiencies.  See Francois'
+paper for alternative representation.  Even with pure functional programming,
+the representation that is the easiest to verify may not be the one that is
+the fastest.
+
+Key ideas of Francois's paper --- use deBruijn levels instead.
+
+But: what if we add "weakening" constructors to the expression datatype?  This
+is an easy way to regain some efficiency. With less cost because we don't have
+to prove our term translations are correct.
 
 \subsection{Preliminaries}
 
@@ -245,7 +281,8 @@ instance Index [a] where
 
 \section{Type representation}
 
-First, our datatype for types. Type variables are represented by indices (natural numbers). 
+First, our datatype for types. Type variables are represented
+by indices (natural numbers). 
 
 \begin{code}
 $(singletons [d|
@@ -255,6 +292,7 @@ $(singletons [d|
       |  FnTy Ty Ty
       |  PolyTy Nat Ty        -- forall {a,b}. a -> b
                               -- PolyTy 2 (FnTy (VarTy 0) (VarTy 1))
+      |  VoidTy               -- uninhabited
          deriving (Eq,Show)
     |])
 \end{code}
@@ -281,10 +319,10 @@ with.
 $(singletons [d|
     data Sub =
         IdSub 
-     |  ConsSub Ty Sub
-     |  LiftSub Nat Sub
+     |  ConsSub Ty Sub    -- FP uses Ty \cdot Sub
+     |  LiftSub Nat Sub   -- FP uses fat-arrow up
      |  TailSub Nat Sub
-     |  IncSub Nat     
+     |  IncSub Nat        -- FP uses +i (and thin-arrow up for subst with this)
         deriving (Eq, Show)
     |])
 \end{code}
@@ -304,6 +342,12 @@ type variables (the function |applys| below).
     to the left, dropping the first |k| elements.
 \item |IncSub k| - increment all variables by |k|.
 \end{itemize}
+
+"In short, ↑i t is the term obtained by adding i to every variable that
+appears free in the term t. The symbol ↑i can be intuitively read as an
+end-of-scope mark: it means that the i most-recently-introduced variables are
+not in scope in the term that follows (Bird and Paterson, 1999, Hendriks and
+van Oostrom, 2003)."
 
 Because we are working with n-ary binders, some of these operations are
 n-ary.
@@ -336,7 +380,8 @@ $(singletons [d|
     subst s BaseTy        = BaseTy
     subst s (VarTy k)     = applys s k
     subst s (FnTy a r)    = FnTy (subst s a) (subst s r)
-    subst s (PolyTy k a)  = PolyTy k (subst (LiftSub k s) a) 
+    subst s (PolyTy k a)  = PolyTy k (subst (LiftSub k s) a)
+    subst s VoidTy        = VoidTy
     |])
 
 instance Index Sub where
@@ -350,11 +395,11 @@ where the ith type in the list is the substitution for variable i.
 \begin{code}
 toList :: Sub -> [Ty]
 toList IdSub           = VarTy <$> [0, 1 ..]
-toList (ConsSub x y)   = (x : toList y)
+toList (ConsSub x y)   = x : toList y
 toList (IncSub k)      = VarTy <$> enumFrom k
 toList (TailSub k s)   = applyN k tail (toList s)
 toList (LiftSub k s)   = if k > 0
-  then (VarTy <$> [0 .. k-1]) <> (map (inc k) (toList s))
+  then (VarTy <$> [0 .. k-1]) <> map (inc k) (toList s)
   else toList s
 \end{code}
 
@@ -374,7 +419,7 @@ operations (as this is not a minimal set).
 
 \begin{code}
 prop_IdSub_def n =
-  IdSub !! n == (ConsSub (VarTy 0) (IncSub 1)) !! n
+  IdSub !! n == ConsSub (VarTy 0) (IncSub 1) !! n
 
 prop_IncSub_def k n =
   IncSub k !! n == TailSub k IdSub !! n
@@ -397,8 +442,7 @@ etc. We do so, with the following unremarkable function.
 \begin{code}
 $(singletons [d|
   fromList :: [Ty] -> Sub
-  fromList []        = IdSub
-  fromList (ty:tys)  = ConsSub ty (fromList tys)
+  fromList = foldr ConsSub IdSub
   |])
 \end{code}
 
@@ -413,7 +457,7 @@ across a list of types.
 \begin{code}
 $(singletons [d|
     incList :: Nat -> [Ty] -> [Ty]
-    incList k tys = map (subst (IncSub k)) tys
+    incList k = map (subst (IncSub k))
    |])
 \end{code}
 
@@ -511,7 +555,7 @@ in the type annotations.
 
 \begin{code}
 -- Substitute types in terms
-substTy :: forall s g ty. Sing s -> (Exp g ty) -> Exp (SubstList s g) (Subst s ty)
+substTy :: forall s g ty. Sing s -> Exp g ty -> Exp (SubstList s g) (Subst s ty)
 substTy s EBase         = EBase
 substTy s (EVar v)      = EVar (substVar @s v)
 substTy s (ELam ty e)   = ELam (sSubst s ty) (substTy s e)
@@ -597,11 +641,11 @@ contexts.
 
 \begin{code}
 axiom_LiftInc :: forall g s k.
-  Sing s -> Sing k -> Subst (LiftSub k s) (Subst (IncSub k) g) :~: (Subst (IncSub k) (Subst s g))
+  Sing s -> Sing k -> Subst (LiftSub k s) (Subst (IncSub k) g) :~: Subst (IncSub k) (Subst s g)
 axiom_LiftInc _ _ = unsafeCoerce Refl
 
 axiom_LiftIncList1 :: forall g s k.
-  Sing s -> Sing k -> (LiftList k s (IncList k g)) :~: (IncList k (SubstList s g))
+  Sing s -> Sing k -> LiftList k s (IncList k g) :~: IncList k (SubstList s g)
 axiom_LiftIncList1 _ _ = unsafeCoerce Refl
 \end{code}
 
@@ -746,11 +790,11 @@ eval (EVar v) = case v of {}
 Another example -- parallel reduction. Needs an axiom!
 
 \begin{code}
-axiomPar :: forall g k ty1 tys. (k ~ NatLength tys) => Sing tys ->
-     SubstList (FromList tys) (IncList k g) :~: g
+axiomPar :: forall g tys. Sing tys ->
+     SubstList (FromList tys) (IncList (NatLength tys) g) :~: g
 axiomPar _ = undefined
 
-prop_Par g ty1 tys = substList (fromList tys) (incList (natLength tys) g) == g
+prop_Par g tys = substList (fromList tys) (incList (natLength tys) g) == g
 
 par :: forall g ty. Exp g ty -> Exp g ty
 par EBase    = EBase
@@ -761,7 +805,7 @@ par (EApp e1 e2) = case par e1 of
 par (ELam ty e) = ELam ty (par e)
 par (TyApp (e :: Exp g (PolyTy k ty1)) (tys :: Sing tys)) = case par e of
   TyLam k (e' :: Exp (IncList k g) ty1)
-    | Refl <- axiomPar @g @k @ty1 tys
+    | Refl <- axiomPar @g tys
     -> e1 where
       e1 :: Exp (SubstList (FromList tys) (IncList k g)) (Subst (FromList tys) ty1)
       e1 = substTy (sFromList tys) e'
@@ -782,23 +826,23 @@ data UExp =
 
 Untyped version
 \begin{code}
-utc :: Nat -> [Ty] -> UExp -> Maybe Ty
-utc k g (UVar j)    = natIdx g j
-utc k g (ULam t1 e) = do
-  t2 <- utc k (t1:g) e
+utc :: [Ty] -> UExp -> Maybe Ty
+utc g (UVar j)    = natIdx g j
+utc g (ULam t1 e) = do
+  t2 <- utc (t1:g) e
   return (FnTy t1 t2)
-utc k g (UApp e1 e2) = do
-  t1 <- utc k g e1
-  t2 <- utc k g e2
+utc g (UApp e1 e2) = do
+  t1 <- utc g e1
+  t2 <- utc g e2
   case t1 of
     FnTy t12 t22
       | t12 == t2 -> Just t22
     _ -> Nothing
-utc k g (UTyLam j e) = do
-  ty <- utc (k+j) g e
+utc g (UTyLam k e) = do
+  ty <- utc (incList k g) e
   return (PolyTy k ty)
-utc k g (UTyApp e tys) = do
-  ty <- utc k g e
+utc g (UTyApp e tys) = do
+  ty <- utc g e
   case ty of
     PolyTy k ty1
       | k == natLength tys
@@ -806,16 +850,15 @@ utc k g (UTyApp e tys) = do
     _ -> Nothing
 \end{code}
 
-Typed version, in CPS style
 
-We use CPS style becaus we need to return both the intriniscally typed term and a singleton for its type.
-Otherwise we need to define a special purpose datatype. But maybe that is easier to understand anyways.
+Type checker
 
 \begin{code}
 data TcResult f ctx where
   Checks :: Sing t -> f ctx t -> TcResult f ctx
   Errors :: String -> TcResult f ctx
 
+--seq :: TcResult f ctx -> (Sing t -> f ctx t -> TcResult f ctx) -> TcResult f ctx
 
 tcVar :: Sing ctx -> Nat -> TcResult Var ctx
 tcVar (SCons t _ )   Z     = Checks t VZ
@@ -830,12 +873,11 @@ tcExp g (UVar k) =
   case tcVar g k of
     Checks t v -> Checks t (EVar v)
     Errors s   -> Errors s 
-tcExp g (ULam t1 u) =
-  case (toSing t1) of
-    SomeSing sT1 ->
-      case (tcExp (SCons sT1 g) u) of
-        Checks sT2 e -> Checks (SFnTy sT1 sT2) (ELam sT1 e)
-        Errors s     -> Errors s
+tcExp g (ULam t1 u)
+  | SomeSing sT1 <- toSing t1
+  = case (tcExp (SCons sT1 g) u) of
+      Checks sT2 e -> Checks (SFnTy sT1 sT2) (ELam sT1 e)
+      Errors s     -> Errors s
 tcExp g (UApp u1 u2) =
   case (tcExp g u1) of
     Checks t1 e1 -> case (tcExp g u2) of
@@ -848,26 +890,277 @@ tcExp g (UApp u1 u2) =
           _ -> Errors "Not a function type"
       Errors s -> Errors s
     Errors s -> Errors s
-tcExp g (UTyLam k u1) =
-  case (toSing k) of
-    SomeSing sK ->
-      case (tcExp (sIncList sK g) u1) of
-        Checks t1 e1 -> Checks (SPolyTy sK t1) (TyLam sK e1)
-        Errors s     -> Errors s
-tcExp g (UTyApp u1 tys) =
-  case (toSing tys) of
-    SomeSing sTys ->
-      case (tcExp g u1) of
-        Checks t e1 ->
-          case t of
-            (SPolyTy sK t1) ->
-              case testEquality sK (sNatLength sTys) of
-                Just Refl -> Checks (sSubst (sFromList sTys) t1) (TyApp e1 sTys)
-                Nothing -> Errors "Wrong number of type args"
-            _ -> Errors "Wrong type in tyapp"
-        Errors s -> Errors s
+tcExp g (UTyLam k u1)
+  | SomeSing sK <- toSing k
+  = case (tcExp (sIncList sK g) u1) of
+      Checks t1 e1 -> Checks (SPolyTy sK t1) (TyLam sK e1)
+      Errors s     -> Errors s
+tcExp g (UTyApp u1 tys)
+  | SomeSing sTys <- toSing tys
+  = case (tcExp g u1) of
+      Checks t e1 ->
+        case t of
+          (SPolyTy sK t1) ->
+            case testEquality sK (sNatLength sTys) of
+              Just Refl -> Checks (sSubst (sFromList sTys) t1) (TyApp e1 sTys)
+              Nothing -> Errors "Wrong number of type args"
+          _ -> Errors "Wrong type in tyapp"
+      Errors s -> Errors s
 \end{code}
 
+Example: Typeof
+
+\begin{code}
+varTy :: Sing g -> Var g t -> Sing t
+varTy (SCons t _)  VZ      = t
+varTy (SCons _ g)  (VS n)  = varTy g n
+varTy SNil         v       = case v of {}
+
+typeOf :: Sing g -> Exp g t -> Sing t
+typeOf g (EVar v)       = varTy g v
+typeOf g EBase          = SBaseTy
+typeOf g (ELam t1 e)    = SFnTy t1 (typeOf (SCons t1 g) e)
+typeOf g (EApp e1 e2)   =
+  case typeOf g e1 of
+    SFnTy _ t2 -> t2
+typeOf g (TyLam k e)    = SPolyTy k (typeOf (sIncList k g) e)
+typeOf g (TyApp e tys)  =
+  case typeOf g e of
+    SPolyTy k t1 -> sSubst (sFromList tys) t1
+\end{code}
+
+Example: CPS conversion
+
+Note: need to know that these type functions are injective
+
+\begin{code}
+type family CpsTy a = r | r -> a where
+  CpsTy (VarTy i)      = VarTy i
+  CpsTy BaseTy         = BaseTy
+  CpsTy (FnTy t1 t2)   = FnTy (CpsTy t1) (FnTy (ContTy t2) VoidTy)
+  CpsTy (PolyTy k t1)  = PolyTy k (FnTy (ContTy t1) VoidTy)
+  CpsTy VoidTy         = VoidTy
+
+type family ContTy a = r | r -> a where
+  ContTy t = FnTy (CpsTy t) VoidTy
+
+type family CpsList a = r | r -> a where
+   CpsList '[] = '[]
+   CpsList (t ': ts) = (CpsTy t ': CpsList ts)
+
+----------------------------------------------------------------
+-- UGH: have to write these by hand
+
+cpsTy :: Ty -> Ty
+cpsTy (VarTy i)      = VarTy i
+cpsTy BaseTy         = BaseTy
+cpsTy (FnTy t1 t2)   = FnTy (cpsTy t1) (FnTy (contTy t2) VoidTy)
+cpsTy (PolyTy k t1)  = PolyTy k (FnTy (contTy t1) VoidTy)
+cpsTy VoidTy         = VoidTy
+
+contTy :: Ty -> Ty
+contTy t = FnTy (cpsTy t) VoidTy
+
+cpsList :: [Ty] -> [Ty]
+cpsList [] = []
+cpsList (t:ts) = cpsTy t : cpsList ts
+
+
+sCpsTy :: Sing t -> Sing (CpsTy t)
+sCpsTy (SVarTy i)      = SVarTy i
+sCpsTy SBaseTy         = SBaseTy
+sCpsTy (SFnTy t1 t2)   = SFnTy (sCpsTy t1) (SFnTy (sContTy t2) SVoidTy)
+sCpsTy (SPolyTy k t1)  = SPolyTy k (SFnTy (sContTy t1) SVoidTy)
+sCpsTy SVoidTy         = SVoidTy
+
+sContTy :: Sing t -> Sing (ContTy t)
+sContTy t = SFnTy (sCpsTy t) SVoidTy
+
+sCpsList :: Sing ts -> Sing (CpsList ts)
+sCpsList SNil = SNil
+sCpsList (SCons t ts) = SCons (sCpsTy t) (sCpsList ts)
+
+----------------------------------------------------------------
+-- NOTE: we still need CpsList because we have to convert the
+-- type arguments
+type family CpsSub s = r | r -> s where
+  CpsSub IdSub          = IdSub
+  CpsSub (IncSub n)     = IncSub n
+  CpsSub (ConsSub t ts) = ConsSub (CpsTy t) (CpsSub ts)
+  CpsSub (TailSub n s)  = TailSub n (CpsSub s)
+  CpsSub (LiftSub n s)  = LiftSub n (CpsSub s)
+
+cpsSub :: Sub -> Sub
+cpsSub IdSub = IdSub
+cpsSub (IncSub n)     = IncSub n
+cpsSub (ConsSub t ts) = ConsSub (cpsTy t) (cpsSub ts)
+cpsSub (TailSub n s)  = TailSub n (cpsSub s)
+cpsSub (LiftSub n s)  = LiftSub n (cpsSub s)
+
+sCpsSub :: Sing s -> Sing (CpsSub s)
+sCpsSub SIdSub = SIdSub
+sCpsSub (SIncSub n)     = SIncSub n
+sCpsSub (SConsSub t ts) = SConsSub (sCpsTy t) (sCpsSub ts)
+sCpsSub (STailSub n s)  = STailSub n (sCpsSub s)
+sCpsSub (SLiftSub n s)  = SLiftSub n (sCpsSub s)
+
+
+cpsCommutes3 :: forall s ty.
+               CpsTy (Subst s ty) :~: Subst (CpsSub s) (CpsTy ty)
+cpsCommutes3 = unsafeCoerce Refl
+
+cps_commutes3 s ty =
+  cpsTy (subst s ty) == subst (cpsSub s) (cpsTy ty)
+
+
+
+cpsCommutes :: forall n ty.
+               CpsTy (Subst (IncSub n) ty) :~: Subst (IncSub n) (CpsTy ty)
+cpsCommutes = unsafeCoerce Refl
+
+cps_commutes n ty =
+  cpsTy (subst (IncSub n) ty) == subst (IncSub n) (cpsTy ty)
+
+cpsCommutes2 :: forall tys ty.
+               CpsTy (Subst (FromList tys) ty) :~:
+               Subst (FromList (CpsList tys)) (CpsTy ty)
+cpsCommutes2 = unsafeCoerce Refl
+
+cps_commutes2 tys ty =
+  cpsTy (subst (fromList tys) ty) == subst (fromList (cpsList tys)) (cpsTy ty)
+
+cpsNatLength :: forall tys. NatLength tys :~: NatLength (CpsList tys)
+cpsNatLength = unsafeCoerce Refl
+
+cps_natLength tys =
+  natLength tys == natLength (cpsList tys)
+\end{code}
+
+\begin{code}
+--cpsProg ::
+
+data CpsCtx g g' where
+  CpsStart  :: CpsCtx '[] '[]
+  CpsELam   :: Sing t1 -> Sing t2 -> CpsCtx g g'
+            -> CpsCtx (t1 ': g) (ContTy t2  ': CpsTy t1 ': g')
+  CpsEApp   :: Sing t1 -> CpsCtx g g'
+            -> CpsCtx (t1 ': g) (CpsTy t1  ': g')
+  CpsTyLam  :: Sing t1 -> CpsCtx g g'
+            -> CpsCtx        g  (ContTy t1 ': g')
+
+sIncCpsCtx :: forall n g g'.
+              Sing n -> CpsCtx g g' -> CpsCtx (IncList n g) (IncList n g')
+sIncCpsCtx n CpsStart = CpsStart
+sIncCpsCtx n (CpsELam (t1 :: Sing t1) (t2 :: Sing t2) gg)
+  | Refl <- cpsCommutes3 @(IncSub n) @t1
+  , Refl <- cpsCommutes3 @(IncSub n) @t2
+  = CpsELam (sInc n t1) (sInc n t2) (sIncCpsCtx n gg)
+sIncCpsCtx n (CpsEApp (t1 :: Sing t1) gg)
+  | Refl <- cpsCommutes3 @(IncSub n) @t1
+  = CpsEApp (sInc n t1) (sIncCpsCtx n gg)
+sIncCpsCtx n (CpsTyLam (t1 :: Sing t1) gg)
+  | Refl <- cpsCommutes3 @(IncSub n) @t1
+  = CpsTyLam (sInc n t1) (sIncCpsCtx n gg)
+  
+
+fstCtx :: CpsCtx g g' -> Sing g
+fstCtx CpsStart = SNil
+fstCtx (CpsELam t1 t2 gg) = SCons t1 (fstCtx gg)
+fstCtx (CpsEApp t1 gg)    = SCons t1 (fstCtx gg)
+fstCtx (CpsTyLam t1 gg)   = fstCtx gg
+
+
+cpsVar :: CpsCtx g g' -> Var g t -> Var g' (CpsTy t)
+cpsVar CpsStart v = case v of {}
+cpsVar (CpsELam t1 t2 gg) VZ     =  VS VZ
+cpsVar (CpsELam t1 t2 gg) (VS v) =  VS (VS (cpsVar gg v))
+cpsVar (CpsEApp t1 gg) VZ     =  VZ
+cpsVar (CpsEApp t1 gg) (VS v) =  VS (cpsVar gg v)
+cpsVar (CpsTyLam t1 gg)   v      =  VS (cpsVar gg v)
+
+
+-- Follow Francois' "inefficient" version
+-- Note the uses of substE and substCont in the EApp case
+-- NOTE: if Meta was *actually* meta (i.e. a Haskell function), we would
+-- not be able to reify it correctly
+data Cont g t where
+  Obj  :: Exp g (FnTy t VoidTy) -> Cont g t
+  Meta :: Exp (t ': g) VoidTy   -> Cont g t
+
+applyCont :: Cont g t -> Exp g t -> Exp g VoidTy
+applyCont (Obj o)  v  = EApp o v
+applyCont (Meta k) v  = (substE (EConsSub v EIdSub)) k
+
+reifyCont :: Sing t -> Cont g t -> Exp g (FnTy t VoidTy)
+reifyCont t (Obj o)   = o
+reifyCont t (Meta k)  = ELam t k
+
+substCont :: ESub g g' -> Cont g t -> Cont g' t
+substCont s (Obj o)   = Obj (substE s o)
+substCont s (Meta k)  = Meta (substE (ELiftSub s) k)
+
+substTyCont :: Sing s -> Cont g t -> Cont (SubstList s g) (Subst s t)
+substTyCont s (Obj o)   = Obj (substTy s o)
+substTyCont s (Meta k)  = Meta (substTy s k)
+
+cpsExp :: forall t g g'.
+          CpsCtx g g' 
+       -> Exp g t
+       -> Cont g' (CpsTy t) 
+       -> Exp g' VoidTy
+cpsExp gg (EVar v)      k = applyCont k (EVar (cpsVar gg v))
+cpsExp gg EBase         k = applyCont k EBase
+cpsExp gg (ELam t1 e1)  k =
+  case typeOf (fstCtx gg) (ELam t1 e1) of
+   (SFnTy (t1 :: Sing t1) (t2 :: Sing t2)) ->
+      let
+        e'  = ELam (sCpsTy t1)
+               $ ELam (sContTy t2)
+                 $ cpsExp (CpsELam t1 t2 gg) e1 k'
+
+        k'  = Obj $ EVar VZ
+
+      in
+        applyCont k e'    
+cpsExp gg (TyLam n e) k   = 
+  case typeOf (fstCtx gg) (TyLam n e) of
+    SPolyTy _k (t1 :: Sing t1) -> 
+      applyCont k $ TyLam n 
+                  $ ELam (sContTy t1) 
+                  $  cpsExp (CpsTyLam t1 (sIncCpsCtx n gg)) e (Obj $ EVar VZ)
+    
+cpsExp gg (EApp e1 e2)  k =
+  case typeOf (fstCtx gg) e1 of
+   (SFnTy (t1 :: Sing t1) (t2 :: Sing t2)) ->
+     let
+        k1 :: Cont g' (CpsTy (FnTy t1 t2))
+        k1 = Meta $ cpsExp (CpsEApp (SFnTy t1 t2) gg) (substE EIncSub e2) k2
+
+        k2 :: Cont (CpsTy (FnTy t1 t2) ': g') (CpsTy t1)
+        k2 = Meta $ EApp (EApp (EVar (VS VZ)) (EVar VZ))
+               (reifyCont (sCpsTy t2) (substCont EIncSub (substCont EIncSub k)))
+     in
+       cpsExp gg e1 k1
+cpsExp (gg :: CpsCtx g g') (TyApp e1 (tys :: Sing tys)) k =
+  case typeOf (fstCtx gg) e1 of
+    SPolyTy (n :: Sing n) (t1 :: Sing t1)
+      | Refl <- cpsCommutes2 @tys @t1
+      , Refl <- cpsNatLength @tys
+      ->
+      
+      let 
+          k1 :: Cont g' (CpsTy (PolyTy n t1))
+          k1 = Meta $ EApp (TyApp (EVar VZ) (sCpsList tys)) (reifyCont t1' k2)
+
+          k2 :: Cont (CpsTy (PolyTy n t1) ': g') 
+                     (Subst (FromList (CpsList tys)) (CpsTy t1))
+          k2 = substCont EIncSub k
+
+          t1' :: Sing (Subst (FromList (CpsList tys))  (CpsTy t1))
+          t1' = sSubst (sFromList (sCpsList tys)) (sCpsTy t1)
+      in
+        cpsExp gg e1 k1
+\end{code}
 
 
 \section {testing code}
@@ -941,6 +1234,17 @@ qc :: Testable prop => prop -> IO ()
 qc = quickCheckWith (stdArgs { maxSuccess = 1000 })
 \end{code}
 
+\section{Related Work}
+
+A Type-Preserving Compiler in Haskell
+Louis-Julien Guillemette Stefan Monnier
+ICFP 2008
+Uses "standard" de Brujn Indices to represent System F types
+"Pre-datakinds"  uses newtypes to introduce constructors for
+All/Var in Type.
+
+Revisiting the CPS Transformation and its Implementation
+Franc¸ois Pottier
 
 
 %% Acknowledgments

@@ -114,7 +114,7 @@ Text of abstract \ldots.
 {-# OPTIONS_GHC -fwarn-incomplete-patterns -Wno-redundant-constraints #-}
 module SysF where
 
-import Prelude hiding ((!!))
+import Prelude hiding ((!!),(>>))
 import Test.QuickCheck
 import Data.Singletons
 import Data.Singletons.Prelude
@@ -122,6 +122,8 @@ import Data.Singletons.TH
 import Data.Kind(Type)
 
 import Data.Type.Equality
+
+import Debug.Trace
 \end{code}
 %endif
 
@@ -141,11 +143,10 @@ of actual Haskell types (of kind |Type|), the usual shallow embedding of
 types.
 
 Furthermore, this representation includes polymorphic types, which is an
-uncommon example for a strongly-typed embedding.
+uncommon example for a strongly-typed embedding (in Haskell).
 
-
-We will use deBruijn indices, with parallel substitutions to
-represent type variables in System F.
+We will use deBruijn indices, with explicit substitutions to represent type
+variables in System F.
 
 Why are we doing this:
 \begin{enumerate}
@@ -235,6 +236,11 @@ $(singletons [d|
     natIdx (x:_)  Z     = Just x
     natIdx (_:xs)(S n)  = natIdx xs n
     natIdx []    n      = Nothing
+
+    dropNat :: Nat -> [a] -> [a]
+    dropNat Z xs          = xs
+    dropNat (S n) (_:xs)  = dropNat n xs
+    dropNat n     []      = []                           
  
     |])
 
@@ -281,8 +287,8 @@ instance Index [a] where
 
 \section{Type representation}
 
-First, our datatype for types. Type variables are represented
-by indices (natural numbers). 
+Below, our datatype for types. Type variables are represented
+by indices (i.e. natural numbers). 
 
 \begin{code}
 $(singletons [d|
@@ -292,10 +298,12 @@ $(singletons [d|
       |  FnTy Ty Ty
       |  PolyTy Nat Ty        -- forall {a,b}. a -> b
                               -- PolyTy 2 (FnTy (VarTy 0) (VarTy 1))
-      |  VoidTy               -- uninhabited
          deriving (Eq,Show)
     |])
 \end{code}
+
+For example, the type |forall a b. a -> b| is represented by the AST |PolyTy 2
+(FnTy (VarTy 0) (VarTy 1))|.
 
 Now, the representation of substitutions. In this representation,
 substitutions are usually defined as functions from (natural number) indices
@@ -303,13 +311,12 @@ to types. This makes sense, in general, because these substitutions are
 "infinite" --- they apply to all type indices.
 
 However, in Haskell, we want to work with these substitutions at the type
-level, which does not include type-level lambda expressions. SVarfore, it is
+level, which does not include type-level lambda expressions. Here, it is
 difficult to define the appropriate substitutions.
 
 Therefore, we use the following datatype as a "defunctionalized" version of
-substitions and substitution-producing operations. For convenience, this is
-not a minimal definition; we can define some of these operations in terms of
-others. However, it is more convenient to have them all defined in this way.
+substitions and substitution-producing operations.\footnote{Like the explicit
+substitutions of Abadi et al.}
 
 We could have also let the singletons library take care of the
 defunctionalization for us. But that might be even more difficult to work
@@ -317,15 +324,22 @@ with.
 
 \begin{code}
 $(singletons [d|
-    data Sub =
-        IdSub 
-     |  ConsSub Ty Sub    -- FP uses Ty \cdot Sub
-     |  LiftSub Nat Sub   -- FP uses fat-arrow up
-     |  TailSub Nat Sub
-     |  IncSub Nat        -- FP uses +i (and thin-arrow up for subst with this)
+    data Sub = 
+        IdSub              -- ^ identity 
+     |  Ty  :· Sub         -- ^ cons
+     |  IncSub Nat         -- ^ increment
+     |  Sub :∘  Sub        -- ^ composition
+     |  LiftSub Nat Sub    -- ^ shift sub under a binder
         deriving (Eq, Show)
+
+    infixr :·    -- like usual cons operator (:)
+    infixr :∘    -- like usual composition  (.)
     |])
+
+-- infix notation
+(>>) = (:∘)
 \end{code}
+
 
 We can understand these substitutions by looking at their behavior on
 type variables (the function |applys| below).
@@ -333,100 +347,348 @@ type variables (the function |applys| below).
 \begin{itemize}
 \item |IdSub| - the identity substitution. When used during substitution,
     maps all type variables to themselves.
-\item |ConsSub ty s| - extends a substitution, by adding a new definition for
+\item |ty :· s| - extends a substitution by adding a new definition for
     index 0 and shifting everything in |s| one step to the right.
-\item |LiftSub k s| - exactly what we need when we go under a binder.
-    indices 0..k-1 are left alone, and the free variables in the range of s
-    are all incremented by k.
-\item |TailSub k s| - the opposite of cons. shift everything in |s| |k| steps
-    to the left, dropping the first |k| elements.
-\item |IncSub k| - increment all variables by |k|.
+\item |IncSub n| - increment all variables by |n|.
+  Sometimes written as |(+n)| or  $\uparrow^{n}$
+\item |s2 :∘ s1| - composition
+\item |LiftSub n s| - shift a substitution in preparation
+  to go under a binder, definable in terms of the previous three
 \end{itemize}
 
+Quotation from Pottier:
 "In short, ↑i t is the term obtained by adding i to every variable that
 appears free in the term t. The symbol ↑i can be intuitively read as an
 end-of-scope mark: it means that the i most-recently-introduced variables are
 not in scope in the term that follows (Bird and Paterson, 1999, Hendriks and
 van Oostrom, 2003)."
 
-Because we are working with n-ary binders, some of these operations are
-n-ary.
+Usually the increment operator only works one at a time. But we choose to
+allow a primitive n-ary increment operation. 
 
 The `subst` operation then extends the substitution for a single index
 throughout the type structure. When this function calls itself recursively
-under a binder, it uses `LiftSub` to modify the input substitution
-appropriately.
-
+under a binder, it uses `lift` to modify the input substitution.
+In particular |LiftSub| is exactly what we need when we go under a binder.
+With |LiftSub k s|, the indices |0..k-1| are left alone, and
+the free variables in the range of |s| are all incremented by |k|.
 
 \begin{code}
 $(singletons [d|
-    inc :: Nat -> Ty -> Ty
-    inc k = subst (IncSub k)
+              
 
-    -- determine s !! i
+    -- the value of the de Bruijn index i in the substitution s
+    -- also written as "s !! i"               
     applys :: Sub -> Nat -> Ty
-    applys IdSub          x  = VarTy x
-    applys (ConsSub e s)  x  = case x of
-                                 Z      -> e
-                                 (S m)  -> applys s m
-    applys (LiftSub k s)  x  = if x < k 
-                                 then VarTy x
-                                 else inc k (applys s (subNat x k))
-    applys (TailSub k s)  x  = applys s (addNat k x)
-    applys (IncSub  k)    x  = VarTy (addNat k x)
+    applys IdSub       x = VarTy x
+    applys (e :· s)    x = case x of
+                            Z      -> e
+                            (S m)  -> applys s m
+    applys (IncSub n)  x = VarTy (addNat n x)
+    applys (s1 :∘ s2)  x = subst s2 (applys s1 x)
+    applys (LiftSub n s) x = if x < n 
+                             then VarTy x
+                             else inc n (applys s (subNat x n))
 
-    -- type substitution operation           
+
+    -- apply a substitution to a type
     subst :: Sub -> Ty -> Ty
     subst s BaseTy        = BaseTy
-    subst s (VarTy k)     = applys s k
+    subst s (VarTy x)     = applys s x
     subst s (FnTy a r)    = FnTy (subst s a) (subst s r)
-    subst s (PolyTy k a)  = PolyTy k (subst (LiftSub k s) a)
-    subst s VoidTy        = VoidTy
+    subst s (PolyTy n a)  = PolyTy n (lift n s a)
+
+    -- apply an increment substitution  (\uparrow^n)
+    inc :: Nat -> Ty -> Ty
+    inc n = subst (IncSub n)
+
+    -- apply a lift substitution (\Uparrow^n)
+    lift :: Nat -> Sub -> Ty -> Ty
+    lift n s = subst (LiftSub n s)
+
     |])
 
 instance Index Sub where
   type Element Sub = Ty
   s !! x = applys s x
+
 \end{code}
 
-We can also visualize substiutions as infinite lists of types,
+Even though the singletons library allows us to use higher-order functions,
+like |map| it is not always convenient to do so. For ease, we define names
+for some common maps that we will need later. These names make it easy for
+us to refer to these operations later.
+
+\begin{code}
+$(singletons [d|
+              
+    substList :: Sub -> [Ty] -> [Ty]
+    substList s = map (subst s)                                
+
+    incList :: Nat -> [Ty] -> [Ty]
+    incList n = map (subst (IncSub n))
+               
+    liftList :: Nat -> Sub -> [Ty] -> [Ty]
+    liftList n s = map (subst (LiftSub n s))
+
+   |])
+\end{code}
+
+\subsection{Stream interpretation}
+
+We can also visualize substitutions as infinite lists of types,
 where the ith type in the list is the substitution for variable i.
 
 \begin{code}
 toList :: Sub -> [Ty]
-toList IdSub           = VarTy <$> [0, 1 ..]
-toList (ConsSub x y)   = x : toList y
-toList (IncSub k)      = VarTy <$> enumFrom k
-toList (TailSub k s)   = applyN k tail (toList s)
-toList (LiftSub k s)   = if k > 0
-  then (VarTy <$> [0 .. k-1]) <> map (inc k) (toList s)
-  else toList s
+toList IdSub         = VarTy <$> [0, 1 ..]
+toList (x :· y)      = x : toList y
+toList (IncSub n)    = VarTy <$> enumFrom n
+toList (s1 :∘ s2)    = substList s2 (toList s1)
+toList (LiftSub Z s) = toList IdSub
+toList (LiftSub (S n) s) =
+  (VarTy <$> [0, 1 .. n]) <> toList (s :∘ IncSub (S n))
+
 \end{code}
 
 We can express the connection between the two interpretations of substitutions
-using the following quickCheck property.  In otherwords, at any index n,
-the result of applys is the same as first converting the substitution to a list
-and then accessing the nth element.
+using the following quickCheck property.  In other words, at any index |n|, the
+result of |applys| is the same as first converting the substitution to a list
+and then accessing the |n|th element.
 
 \begin{code}
 prop_applys_toList :: Sub -> Nat -> Bool
-prop_applys_toList s n =
-  s !! n == toList s !! n
+prop_applys_toList s x =
+  s !! x == toList s !! x
 \end{code}
 
-More generally, we can test properties about the various substitution
-operations (as this is not a minimal set).
+\subsection{Regular Interpretation}
+
+A \emph{regular substitution} is one of the form
+
+  | t1 :· t2 :· .. :· tk :· IncSub n |
+
+that is, a finite sequence of types followed by |IncSub n|, for some |n|.
+
+All ground substitutions are equivalent to regular substitutions. We should
+be able to compute these things. 
 
 \begin{code}
-prop_IdSub_def n =
-  IdSub !! n == ConsSub (VarTy 0) (IncSub 1) !! n
+tailSub ::Sub -> Sub
+tailSub s = (IncSub 1 :∘ s)
 
-prop_IncSub_def k n =
-  IncSub k !! n == TailSub k IdSub !! n
+dropSub :: Nat -> Sub -> Sub
+dropSub n s = (IncSub n :∘ s)
+
+prop_drop_inc n x =
+  dropSub n (IncSub 1) !! x == IncSub (S n) !! x
+
+
+liftSub :: Nat -> Sub -> Sub
+liftSub n s = go n (s :∘ IncSub n) where
+        go Z      s = s
+        go (S m)  s = go m (VarTy m :· s)
+\end{code}
+
+We represent a regular substitution by the list of types
+and the amount to increment at the end.
+
+\begin{code}
+data RSub = Reg [Ty] Nat deriving (Eq,Show)
+
+-- indexing is just looking up one of the types or
+-- shifting by the appropriate amount
+instance Index RSub where
+  type Element RSub = Ty
+  (Reg ts n) !! x = if x < natLength ts then
+                      ts !! x 
+                   else VarTy (n + (x - natLength ts))
+
+-- We can convert to/from regular substitutions
+fromReg :: RSub -> Sub
+fromReg (Reg []     x) = IncSub x
+fromReg (Reg (t:ts) x) = t :· fromReg (Reg ts x)
+
+toReg :: Sub -> RSub
+toReg IdSub       = Reg [] 0
+toReg (IncSub n)  = Reg [] n
+toReg (x :· y)    = Reg (x : xs) n
+  where Reg xs n  = toReg y
+toReg (LiftSub n s) = toReg (liftSub n s)
+toReg (s1 :∘ s2) = compReg (toReg s1) (toReg s2)
+
+-- Compose two regular substitutions
+compReg :: RSub -> RSub -> RSub
+compReg (Reg [] Z) r2
+  = r2
+compReg (Reg [] xn)    (Reg [] yn)
+  = Reg [] (yn + xn)
+compReg (Reg [] (S n)) (Reg (y:ys) yn)
+  = compReg (Reg [] n) (Reg ys yn)
+compReg (Reg (x:xs) xn) r2
+  = Reg (x':xs') xn'
+     where 
+        x'  = subst (fromReg r2) x
+        Reg xs' xn' = compReg (Reg xs xn) r2
+
+prop_fromReg rs x = rs !! x == fromReg rs !! x
+prop_toReg s x = s !! x == toReg s !! x
+prop_compReg r1 r2 x =
+  compReg r1 r2 !! x == (fromReg r1 :∘ fromReg r2) !! x
+
+
+-- Note: just comparing regular forms isn't coarse enough.
+-- We could have an "index" in the tail of the list of types.
+-- We need to get rid of them somehow
+-- But we can still get a derivable, but inefficient equivalence algorithm
+-- here
+
+eqSubst s1 s2 = all (\k -> r1 !! k == r2 !! k) [0 .. m]
+  where
+     r1 = toReg s1
+     r2 = toReg s2
+     m  = max (extent r1) (extent r2)
+
+extent :: RSub -> Nat
+extent (Reg ts _) = natLength ts
+
+
+-- Question: do we need a type for regular substitutions?
+-- can we just use this for "simplifying" substitutions instead?
 \end{code}
 
 
+\subsection{Properties}
 
+Two of the five primitive substitution forms are actually derivable in terms
+of the other three.
+
+In fact, there are many ways to write the identity substitution:
+\begin{code}
+prop_IdSub_def0 n =
+  IdSub !! n    == IncSub 0 !! n
+prop_IdSub_def1 n =
+  IdSub !! n    == (VarTy 0 :· IncSub 1) !! n
+prop_IdSub_def2 n =
+  IdSub !! n    == (VarTy 0 :· VarTy 1 :· IncSub 2) !! n
+prop_IdSub_def3 n =
+  IdSub !! n    == (VarTy 0 :· VarTy 1 :· VarTy 2 :· IncSub 3) !! n
+\end{code}
+
+Lifting also follows a similar pattern.
+
+\begin{code}
+prop_LiftSub0 s x =
+  LiftSub 0 s !! x == (s :∘ IncSub 0) !! x
+prop_LiftSub1 s x =
+  LiftSub 1 s !! x == (VarTy 0 :· (s :∘ IncSub 1)) !! x
+prop_LiftSub2 s x =
+  LiftSub 2 s !! x == (VarTy 0 :· VarTy 1 :· (s :∘ IncSub 2)) !! x
+
+-- more generally
+prop_LiftSub_def k s x =
+  LiftSub k s !! x == liftSub k s !! x
+\end{code}
+
+\subsection{Axiomatization for substitutions}
+
+Shaefer et al give eight axioms about the equivalence of substitions.
+The first follow directly from our definition of |subst| above.
+
+The remainder are extensional equalities about substitutions:
+\begin{code}
+prop_Shift0 s x =
+  (IncSub Z :∘ s) !! x == s !! x
+  
+prop_ShiftCons n t s x =
+  (IncSub (S n) :∘ (t :· s)) !! x == (IncSub n :∘ s) !! x
+
+prop_IdL s x =
+  (IdSub :∘ s) !! x == s !! x
+
+prop_IdR s x =
+  (s :∘ IdSub) !! x == s !! x
+
+prop_Ass s1 s2 s3 x =
+  ((s1 :∘ s2) :∘ s3) !! x == (s1  :∘ (s2 :∘ s3)) !! x
+
+prop_Map t s1 s2 x =
+  ((t :· s1) :∘ s2) !! x == ((subst s2 t) :· (s1 :∘ s2)) !! x
+
+\end{code}
+
+\subsection{Simplification}
+
+Unfortunately, we cannot normalize terms containing substitution expressions
+because we don't have "explicit" substitutions. In otherwords we cannot write
+type-level functions that dispatch on what substitutions have been applied to
+|Ty| expressions.
+
+It's actually a good thing that we can't do that because we want to have
+unique forms for types. 
+
+\begin{code}
+-- Simplifications
+asimpl :: Sub -> Sub
+-- IdL 
+asimpl (IdSub :∘ s) = s
+-- IdR
+asimpl (s :∘ IdSub) = s
+-- ShiftCons
+asimpl (IncSub Z     :∘ s)        = asimpl s
+asimpl (IncSub (S n) :∘ (t :· s)) = asimpl (IncSub n :∘s)
+-- Map
+asimpl ((t :· s1) :∘ s2) =
+  (subst s2 t) :· (asimpl (s1 :∘ s2))
+-- Ass  
+asimpl ((s1 :∘ s2) :∘ s3) =
+  s1  :∘ (asimpl (s2 :∘ s3))
+  
+-- VarShift (how to generalize?)
+asimpl (VarTy 0 :· IncSub 1) = IdSub
+asimpl (VarTy 0 :· VarTy 1 :· IncSub 2) = IdSub
+
+-- New for n-ary Inc
+asimpl (IncSub 0) = IdSub
+asimpl (IncSub n :∘ IncSub k) = IncSub (n + k)
+
+asimpl s = s
+
+prop_asimpl s n = s !! n == asimpl s !! n 
+\end{code}
+
+\paragraph{Interlude: Lemmas from autosubst}
+
+NOTE: autosubst notation
+|IdSub|        is  |ids|
+|ConsSub t s|  is  |t .: s|
+|LiftSub 1 s|  is  |up s|
+|IncSub 1|     is  |ren (+1)|
+|CompSub s1 s2| is |s1 >> s2|
+
+The substitution "up σ" is equal to
+Var 0 .: (σ >> ren (+1)) where (+1) is the renaming increasing every variable by
+one and .: is the stream-cons operator.
+
+
+The autosubst library automatically generates four substitution lemmas.
+\cite{autosubst-manual}. One of these lemmas states that renaming
+is equal to substitution, so is not pertinent in this context.
+
+However, we can translate the remaining three lemmas to this framework:
+
+\begin{spec}
+subst_comp : forall t s1 s2. subst s2 (subst s1 t) = subst (s1 >> s2) t
+subst_id   : forall t. subst IdSub t = t
+id_subst   : forall x t. subst s (IdSub !! x) = s !! x
+\end{spec}
+
+About subst_comp: "This property is essential and surprisingly difficult to
+show if done manually."
+
+\begin{code}
+prop_subst_id t = subst IdSub t == t
+\end{code}
 
 \section{Terms and types}
 
@@ -442,7 +704,7 @@ etc. We do so, with the following unremarkable function.
 \begin{code}
 $(singletons [d|
   fromList :: [Ty] -> Sub
-  fromList = foldr ConsSub IdSub
+  fromList = foldr (:·) IdSub
   |])
 \end{code}
 
@@ -456,8 +718,6 @@ across a list of types.
 
 \begin{code}
 $(singletons [d|
-    incList :: Nat -> [Ty] -> [Ty]
-    incList k = map (subst (IncSub k))
    |])
 \end{code}
 
@@ -531,15 +791,6 @@ The next step is to define the operation of type substitution in terms.
 Again, we name some operations that we would like to use with type contexts.
 
 
-\begin{code}
-$(singletons [d|  
-    liftList :: Nat -> Sub -> [Ty] -> [Ty]
-    liftList k s = map (subst (LiftSub k s)) 
-               
-    substList :: Sub -> [Ty] -> [Ty]
-    substList s = map (subst s)                                
-   |])
-\end{code}
 
 
 In this definition, instead of using the simply-typed version of these operations,
@@ -641,7 +892,8 @@ contexts.
 
 \begin{code}
 axiom_LiftInc :: forall g s k.
-  Sing s -> Sing k -> Subst (LiftSub k s) (Subst (IncSub k) g) :~: Subst (IncSub k) (Subst s g)
+  Sing s -> Sing k -> Subst (LiftSub k s) (Subst (IncSub k) g)
+  :~: Subst (IncSub k) (Subst s g)
 axiom_LiftInc _ _ = unsafeCoerce Refl
 
 axiom_LiftIncList1 :: forall g s k.
@@ -699,7 +951,7 @@ typeEquality2 _ _ = unsafeCoerce Refl
 prop2 :: Ty -> Sub -> [Ty] -> Bool
 prop2 ty1 s tys =
   subst (fromList (substList s tys))
-    (subst (LiftSub (natLength tys) s) ty1)
+    (lift (natLength tys) s ty1)
     ==
   subst s (subst (fromList tys) ty1)
 
@@ -713,6 +965,7 @@ prop3 :: (a -> b) -> [a] -> Bool
 prop3 f tys = natLength (map f tys) == natLength tys
 
 \end{code}
+
 
 
 \subsection{Term substitutions}
@@ -934,12 +1187,13 @@ Example: CPS conversion
 Note: need to know that these type functions are injective
 
 \begin{code}
+type VoidTy = PolyTy (S Z) (VarTy Z)
+
 type family CpsTy a = r | r -> a where
   CpsTy (VarTy i)      = VarTy i
   CpsTy BaseTy         = BaseTy
   CpsTy (FnTy t1 t2)   = FnTy (CpsTy t1) (FnTy (ContTy t2) VoidTy)
   CpsTy (PolyTy k t1)  = PolyTy k (FnTy (ContTy t1) VoidTy)
-  CpsTy VoidTy         = VoidTy
 
 type family ContTy a = r | r -> a where
   ContTy t = FnTy (CpsTy t) VoidTy
@@ -951,30 +1205,32 @@ type family CpsList a = r | r -> a where
 ----------------------------------------------------------------
 -- UGH: have to write these by hand
 
+voidTy = PolyTy 1 (VarTy 0)
+
 cpsTy :: Ty -> Ty
 cpsTy (VarTy i)      = VarTy i
 cpsTy BaseTy         = BaseTy
-cpsTy (FnTy t1 t2)   = FnTy (cpsTy t1) (FnTy (contTy t2) VoidTy)
-cpsTy (PolyTy k t1)  = PolyTy k (FnTy (contTy t1) VoidTy)
-cpsTy VoidTy         = VoidTy
+cpsTy (FnTy t1 t2)   = FnTy (cpsTy t1) (FnTy (contTy t2) voidTy)
+cpsTy (PolyTy k t1)  = PolyTy k (FnTy (contTy t1) voidTy)
 
 contTy :: Ty -> Ty
-contTy t = FnTy (cpsTy t) VoidTy
+contTy t = FnTy (cpsTy t) voidTy
 
 cpsList :: [Ty] -> [Ty]
 cpsList [] = []
 cpsList (t:ts) = cpsTy t : cpsList ts
 
+sVoidTy :: Sing VoidTy
+sVoidTy = SPolyTy (SS SZ) (SVarTy SZ)
 
 sCpsTy :: Sing t -> Sing (CpsTy t)
 sCpsTy (SVarTy i)      = SVarTy i
 sCpsTy SBaseTy         = SBaseTy
-sCpsTy (SFnTy t1 t2)   = SFnTy (sCpsTy t1) (SFnTy (sContTy t2) SVoidTy)
-sCpsTy (SPolyTy k t1)  = SPolyTy k (SFnTy (sContTy t1) SVoidTy)
-sCpsTy SVoidTy         = SVoidTy
+sCpsTy (SFnTy t1 t2)   = SFnTy (sCpsTy t1) (SFnTy (sContTy t2) sVoidTy)
+sCpsTy (SPolyTy k t1)  = SPolyTy k (SFnTy (sContTy t1) sVoidTy)
 
 sContTy :: Sing t -> Sing (ContTy t)
-sContTy t = SFnTy (sCpsTy t) SVoidTy
+sContTy t = SFnTy (sCpsTy t) sVoidTy
 
 sCpsList :: Sing ts -> Sing (CpsList ts)
 sCpsList SNil = SNil
@@ -983,6 +1239,7 @@ sCpsList (SCons t ts) = SCons (sCpsTy t) (sCpsList ts)
 ----------------------------------------------------------------
 -- NOTE: we still need CpsList because we have to convert the
 -- type arguments
+{-
 type family CpsSub s = r | r -> s where
   CpsSub IdSub          = IdSub
   CpsSub (IncSub n)     = IncSub n
@@ -1004,14 +1261,13 @@ sCpsSub (SConsSub t ts) = SConsSub (sCpsTy t) (sCpsSub ts)
 sCpsSub (STailSub n s)  = STailSub n (sCpsSub s)
 sCpsSub (SLiftSub n s)  = SLiftSub n (sCpsSub s)
 
-
 cpsCommutes3 :: forall s ty.
                CpsTy (Subst s ty) :~: Subst (CpsSub s) (CpsTy ty)
 cpsCommutes3 = unsafeCoerce Refl
 
 cps_commutes3 s ty =
   cpsTy (subst s ty) == subst (cpsSub s) (cpsTy ty)
-
+-}
 
 
 cpsCommutes :: forall n ty.
@@ -1052,14 +1308,14 @@ sIncCpsCtx :: forall n g g'.
               Sing n -> CpsCtx g g' -> CpsCtx (IncList n g) (IncList n g')
 sIncCpsCtx n CpsStart = CpsStart
 sIncCpsCtx n (CpsELam (t1 :: Sing t1) (t2 :: Sing t2) gg)
-  | Refl <- cpsCommutes3 @(IncSub n) @t1
-  , Refl <- cpsCommutes3 @(IncSub n) @t2
+  | Refl <- cpsCommutes @n @t1
+  , Refl <- cpsCommutes @n @t2
   = CpsELam (sInc n t1) (sInc n t2) (sIncCpsCtx n gg)
 sIncCpsCtx n (CpsEApp (t1 :: Sing t1) gg)
-  | Refl <- cpsCommutes3 @(IncSub n) @t1
+  | Refl <- cpsCommutes @n @t1
   = CpsEApp (sInc n t1) (sIncCpsCtx n gg)
 sIncCpsCtx n (CpsTyLam (t1 :: Sing t1) gg)
-  | Refl <- cpsCommutes3 @(IncSub n) @t1
+  | Refl <- cpsCommutes @n @t1
   = CpsTyLam (sInc n t1) (sIncCpsCtx n gg)
   
 
@@ -1180,6 +1436,9 @@ instance Arbitrary Nat where
   shrink Z = []
   shrink (S n) = [n]
 
+instance Arbitrary RSub where
+  arbitrary = Reg <$> arbitrary <*> arbitrary
+  shrink (Reg t x) = [Reg t' x' | t' <- shrink t, x' <- shrink x]
 
 instance Arbitrary Ty where
   arbitrary = sized (gt Z) where
@@ -1200,6 +1459,13 @@ instance Arbitrary Ty where
            a <- gl (n + k) m'
            r <- gt (n + k) m'
            return (PolyTy k r))]
+      
+  shrink BaseTy = []   
+  shrink (VarTy n) = [VarTy n' | n' <- shrink n]
+  shrink (FnTy t1 t2) = t1 : t2 : 
+    [ FnTy t1' t2' | t1' <- shrink t1, t2' <- shrink t2]
+  shrink (PolyTy n t) = t : 
+    [ PolyTy n' t' | n' <- shrink n, t' <- shrink t]
 
 instance Arbitrary Sub where
   arbitrary = sized gt where
@@ -1209,29 +1475,33 @@ instance Arbitrary Sub where
       let m' = m `div` 2 in
       frequency
       [(1, base),
-       (1, ConsSub <$> arbitrary <*> gt m'), -- always closed? FVs?
-       (1, LiftSub <$> arbitrary <*> gt m'),
-       (1, TailSub <$> arbitrary <*> gt m')]
+       (1, (:·) <$> arbitrary <*> gt m'), -- always closed? FVs?
+       (1, (:∘) <$> gt m' <*> gt m')]
 
-    
-
+  shrink IdSub = []
+  shrink (IncSub n) = [IncSub n' | n' <- shrink n]
+  shrink (t :· s)   = s : [t' :· s' | t' <- shrink t, s' <- shrink s]
+  shrink (s1 :∘ s2) = s1 : s2 :
+    [s1' :∘ s2 | s1' <- shrink s1, s2' <- shrink s2]                       
+  shrink (LiftSub n s) = s : [LiftSub n s' | n <- shrink n, s' <- shrink s]
 
 ----------------------------------------------------------------------
 ----------------------------------------------------------------------
 
 
-prop_rename_inc_tail k c s =
-   subst (TailSub k s) c == subst s (subst (IncSub k) c)
 
 prop_cons_sub ty ss tt =
-  subst (ConsSub ty ss) (subst (IncSub 1) tt) == subst ss tt
+  subst (ty :· ss) (subst (IncSub 1) tt) == subst ss tt
 
+
+return []
+runTests = $forAllProperties qc
 \end{code}
 
 
 \begin{code}
-qc :: Testable prop => prop -> IO ()
-qc = quickCheckWith (stdArgs { maxSuccess = 1000 })
+qc :: Testable prop => prop -> IO Result
+qc = quickCheckWithResult (stdArgs { maxSuccess = 1000 })
 \end{code}
 
 \section{Related Work}
@@ -1246,6 +1516,12 @@ All/Var in Type.
 Revisiting the CPS Transformation and its Implementation
 Franc¸ois Pottier
 
+Martín Abadi, Luca Cardelli, Pierre-Louis Curien, and Jean-Jacques Lévy. Explicit
+substitutions. J. Funct. Program., 1(4):375–416, 1991.
+
+Completeness and Decidability of de Bruijn Substitution Algebra in Coq
+Steven Schafer Gert Smolka Tobias Tebbi
+CPP 2015
 
 %% Acknowledgments
 \begin{acks}                            %% acks environment is optional

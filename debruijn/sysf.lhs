@@ -1,4 +1,5 @@
 
+
 \documentclass[sigplan,10pt,review,anonymous]{acmart}
 \settopmatter{printfolios=true,printccs=false,printacmref=false}
 
@@ -19,6 +20,27 @@
 %\citestyle{acmauthoryear}  %% For author/year citations
 
 %include polycode.fmt
+\renewcommand{\Varid}[1]{\textit{#1}}  %% allow _ in identifiers
+%format :∘ = "\mathop{:\!\!\circ}"
+%format :· = "\mathop{:\!\!\cdot}"
+%format . = "."
+%format forall = "\forall"
+%format _ = "\_"
+%format s1 = "\ensuremath{s_1}"
+%format s2 = "\ensuremath{s_2}"
+%format g1 = "\ensuremath{g_1}"
+%format g2 = "\ensuremath{g_2}"
+%format g3 = "\ensuremath{g_3}"
+%format e1 = "\ensuremath{e_1}"
+%format e2 = "\ensuremath{e_2}"
+%format e3 = "\ensuremath{e_3}"
+
+
+%format Nat = "\ensuremath{\mathbb{N}}"
+%format <>  = "\ensuremath{\diamond}"
+%format ~   = "\ensuremath{\mathop{\sim}}"
+%format :~: = "\ensuremath{\mathop{:\sim:}}"
+%format λ   = "\ensuremath{\lambda}"
 
 %% Some recommended packages.
 \usepackage{booktabs}   %% For formal tables:
@@ -30,7 +52,7 @@
 \begin{document}
 
 %% Title information
-\title{Intrinsic polymorphism in Dependent Haskell}
+\title{System F in Dependent Haskell}
 %% Author with single affiliation.
 \author{Stephanie Weirich}
 \orcid{nnnn-nnnn-nnnn-nnnn}             %% \orcid is optional
@@ -114,38 +136,71 @@ Text of abstract \ldots.
 {-# OPTIONS_GHC -fwarn-incomplete-patterns -Wno-redundant-constraints #-}
 module SysF where
 
-import Prelude hiding ((!!),(>>))
-import Test.QuickCheck
+import Prelude hiding ((!!),(>>),drop,take,length)
+import Test.QuickCheck hiding ((===))
 import Data.Singletons
 import Data.Singletons.Prelude
+   hiding (Drop,Take,Length,
+          sDrop,sTake,sLength,
+          DropSym0,DropSym1,DropSym2,
+          TakeSym0,TakeSym1,TakeSym2)
+
 import Data.Singletons.TH
+   hiding (Drop,Take,Length,
+          sDrop,sTake,sLength,
+          DropSym0,DropSym1,DropSym2,
+          TakeSym0,TakeSym1,TakeSym2)
+
 import Data.Kind(Type)
 
 import Data.Type.Equality
 
 import Debug.Trace
+import Nat
 \end{code}
 %endif
 
-Let's get this out of the way early:
+Let's get this out of the way right now.
 \begin{code}
 import Unsafe.Coerce
 \end{code}
+
+This paper is about a balance between the fine-lines of type-based correctness
+and broad strokes of practicality.
+
+In the formost, static types should assist in program design, not stand in the
+way. And definitely not become a vehicle for nerd-sniping naval gazing; where
+we convince ourselves that we are making progress.
+
+At the same time, there are difficult programs out there. Those that are
+difficult to write, and those that are difficult to know when you've gotten
+them right.
+
+One example of such difficulty is the proper treatment of binding.
+
+Variable binding is older than the lambda calculus. And you would think it
+would be \emph{easy} after all of this time. And, it is true that we do know
+how to do it. And so well that we can automate definitions.
 
 This paper is a literate Haskell example of a strongly-typed representation of
 System F. In other words, the datatype only includes well typed System F
 terms.
 
+We're going to do it, but just barely. Along the way there are points where we
+could design the system to be even more implicitly typed, and we will point
+out those opportunities. However, we will refrain from this sort of
+over-exuberance.
+
 Although strongly-typed ASTs are common examples for programming with GADTs,
-this paper goes a bit further. On one hand, it uses a deep embedding types ---
+here we go a bit further. On one hand, it uses a deep embedding types ---
 our AST will be indexed by members of a Haskell datatype, called |Ty| instead
 of actual Haskell types (of kind |Type|), the usual shallow embedding of
 types.
 
-Furthermore, this representation includes polymorphic types, which is an
-uncommon example for a strongly-typed embedding (in Haskell).
+Furthermore, System F includes \emph{polymorphic} types, which bring their own
+challenges to a strongly-typed embedding (in Haskell).
 
-We will use deBruijn indices, with explicit substitutions to represent type
+We will use deBruijn indices with parallel substitutions to represent type
 variables in System F.
 
 Why are we doing this:
@@ -198,226 +253,280 @@ But: what if we add "weakening" constructors to the expression datatype?  This
 is an easy way to regain some efficiency. With less cost because we don't have
 to prove our term translations are correct.
 
-\subsection{Preliminaries}
+\subsection{Preliminaries: Nat and the |singletons| library}
 
-First, a datatype for indices themselves --- natural numbers.
-For simplicity, we will display natural numbers as Ints.
-Eventually, we will move this code into another file as it is
-fairly boring. Would be good to have a run-time representation
-with "Int" (like PeanoRepr).
+First, a datatype for indices themselves --- natural numbers. 
 
-%if False
-\begin{code}
-$(singletons [d|
-    data Nat = Z | S Nat deriving (Eq, Ord)
+\begin{spec}
+data Nat = Z | S Nat
+\end{spec}
 
-    addNat :: Nat -> Nat -> Nat
-    addNat Z     x = x
-    addNat (S y) x  = S (addNat y x)
+We elide definitions relating to natural numbers (the full definitions are
+available in our code base). However, we note that we have instances of this
+type for the classes |Eq|, |Ord|, |Enum|, |Num| (partial) and |Show| (displays
+using digits).
 
-    mulNat :: Nat -> Nat -> Nat
-    mulNat Z     x = Z
-    mulNat (S y) x = addNat x (mulNat y x)
+We have also redefined some prelude operations for lists to use |Nat| instead
+of |Int|, including |take|, |drop|, and the indexing operator |!!|.
 
-    subNat :: Nat -> Nat -> Nat
-    subNat x     Z = x
-    subNat (S x) (S y) = subNat x y
+All of our operations on |Nat| are available in three different forms:
+\begin{enumerate}
+\item As a standard function (starts with lowercase letter)
+\begin{spec}
+ghci> :type take
+take :: Nat -> [a] -> [a]
+\end{spec}
+\item As a type-level function (starts with uppercase letter)
+\begin{spec}
+ghci>:kind Take
+Take :: Nat -> [a] -> [a]
+\end{spec}
+\item As a singleton function (starts with |s| then uppercase letter)
+\begin{spec}
+ghci> :type sTake
+sTake :: Sing t1 -> Sing t2 -> Sing (Take t1 t2)
+\end{spec}
+\end{enumerate}
 
-    applyN :: Nat -> (a -> a) -> a -> a
-    applyN Z     f x = x
-    applyN (S n) f x = f (applyN n f x)
+The singletons library automatically defines the second and third version from
+the first, as well as the \texttt{Sing t} indexed type, displayed above as
+|Sing t|.  However, any code that uses these operations must be careful to use
+the correct one.
 
-    natLength :: [a] -> Nat
-    natLength [] = Z
-    natLength (_:xs) = S (natLength xs)
+Any use of the |Sing a| type indicates the use of dependent types. These
+arguments that are used both as runtime and compile time data.
 
-    -- safe indexing operation
-    natIdx :: [a] -> Nat -> Maybe a
-    natIdx (x:_)  Z     = Just x
-    natIdx (_:xs)(S n)  = natIdx xs n
-    natIdx []    n      = Nothing
 
-    dropNat :: Nat -> [a] -> [a]
-    dropNat Z xs          = xs
-    dropNat (S n) (_:xs)  = dropNat n xs
-    dropNat n     []      = []                           
- 
-    |])
+\section{Type representation with de Bruijn indices}
 
-instance Num Nat where
-  fromInteger 0 = Z
-  fromInteger n | n < 0 = error "CANNOT represent negative numbers"
-  fromInteger n = S (fromInteger (n - 1))
-
-  (+) = addNat
-  (*) = mulNat
-  (-) = subNat
-
-  negate x = error "Negative number"
-  abs x    = x
-  signum Z = 0
-  signum x = 1
-
-instance Enum Nat where
-  toEnum :: Int -> Nat
-  toEnum = fromInteger . toInteger
-  fromEnum :: Nat -> Int
-  fromEnum = natToInt
-
-natToInt :: Nat -> Int
-natToInt Z = 0
-natToInt (S m) = 1 + natToInt m
-
-instance Show Nat where
-  show = show . natToInt
-
-class Index a where
-  type Element a
-  (!!) :: a -> Nat -> Element a
-
-instance Index [a] where
-  type Element [a] = a
-  (x:_)   !!  Z     = x
-  (_:xs)  !! (S n)  = xs !! n
-  []      !! n      = error "(!!): too few elements in index"
-
-  
-\end{code}
-%endif
-
-\section{Type representation}
-
-Below, our datatype for types. Type variables are represented
-by indices (i.e. natural numbers). 
-
+Below, our datatype for types. 
 \begin{code}
 $(singletons [d|
     data Ty =
-         BaseTy
-      |  VarTy Nat
-      |  FnTy Ty Ty
-      |  PolyTy Nat Ty        -- forall {a,b}. a -> b
-                              -- PolyTy 2 (FnTy (VarTy 0) (VarTy 1))
+         BaseTy               
+      |  VarTy Nat            
+      |  FnTy Ty Ty           
+      |  PolyTy Nat Ty        
          deriving (Eq,Show)
     |])
 \end{code}
 
-For example, the type |forall a b. a -> b| is represented by the AST |PolyTy 2
-(FnTy (VarTy 0) (VarTy 1))|.
+Types include base types, like |()| or |Bool|, type variables (which are
+represented by indices), function types and polymorphic types. In the last
+case, we allow polymorphic types to bind several type variables at once. The
+natural number in this type indicates the number of simultaneously bound
+variables.
 
-Now, the representation of substitutions. In this representation,
-substitutions are usually defined as functions from (natural number) indices
-to types. This makes sense, in general, because these substitutions are
-"infinite" --- they apply to all type indices.
+For example, the System F type |forall a b. a -> b| is represented by the value
+|PolyTy 2 (FnTy (VarTy 0) (VarTy 1))|.
 
-However, in Haskell, we want to work with these substitutions at the type
-level, which does not include type-level lambda expressions. Here, it is
-difficult to define the appropriate substitutions.
-
-Therefore, we use the following datatype as a "defunctionalized" version of
-substitions and substitution-producing operations.\footnote{Like the explicit
-substitutions of Abadi et al.}
-
-We could have also let the singletons library take care of the
-defunctionalization for us. But that might be even more difficult to work
-with.
+The important property of this representation is that it all
+$\alpha$-equivalent types have the same representation. In other words, both
+|forall a. a -> a| and |forall b. b -> b| are represented by |idTy| below.
 
 \begin{code}
 $(singletons [d|
-    data Sub = 
-        IdSub              -- ^ identity 
-     |  Ty  :· Sub         -- ^ cons
-     |  IncSub Nat         -- ^ increment
-     |  Sub :∘  Sub        -- ^ composition
-     |  LiftSub Nat Sub    -- ^ shift sub under a binder
+    idTy :: Ty
+    idTy = PolyTy (S Z) (FnTy (VarTy Z) (VarTy Z))
+    |])
+\end{code}
+By defining this value as a |singletons| declaration, we get the term value
+|idTy|, the analogous type |IdTy| (of promoted kind |Ty|) and the singleton
+version that connects the two: |sIdTy :: Sing IdTy|. 
+
+Our goal is to use these types to index a typed term representation.  For example,
+if a System F term |e| has type |Exp g IdTy|, in some context |g|, then |e| should
+only be (the representation of) a polymorphic identity function.
+
+The unique representation property is essential when using this data structure
+to index a strongly typed AST. We don't have to define $\alpha$-equivalence
+for types, as Haskell's pre-existing definition of type equivalence will just
+work.  Furthermore, we don't have to worry that a type indexed by |forall a. a
+-> a| is a different type than one indexed by |forall b. b -> b|; we can
+easily work up to $\alpha-$equivalence with this representation.
+
+\subsection{Substitution algebra}
+
+Although $\alpha$-equivalence comes for free with a de Bruijn representation,
+we still need to define what it means to \emph{substitute} for variables that
+appear in types.
+
+For example, in the strongly typed constructor for type abstractions, written
+|TyApp| and part of the |Exp| GADT, we need to instantiate a polymorphic term
+with (the correct number of) type arguments.  We do so by substituting for the
+bound variables in the body of the polymorphic type.
+
+\begin{spec}
+  TyApp  :: (Length tys ~ n)             -- length requirement
+    => Exp g (PolyTy n ty)               -- polymorphic term
+    -> Sing tys                          -- type arguments
+    -> Exp g (Subst (FromList tys) ty)   -- instantiated type
+\end{spec}
+
+In this type, the type-level function |FromList| converts a list of types to a
+\emph{substitution} and the |Subst| operation applies this substitution to the
+body of the polymorphic type, |ty|.  Furthermore, this data constructor also
+requires that the number of type arguments (the length of the list |tys|) is
+equal to the number of type parameters quantified by the polymorphic type.
+
+Next, the representation of substitutions. We use a concrete representation of
+substitutions, based on the algebraic data type below. 
+\begin{code}
+$(singletons [d|
+    data Sub =
+        Inc Nat            --  increment by n (shift)                
+     |  Ty  :· Sub         --  extend a substitution (like cons)
+     |  Sub :∘  Sub        --  compose substitutions
         deriving (Eq, Show)
 
     infixr :·    -- like usual cons operator (:)
     infixr :∘    -- like usual composition  (.)
     |])
-
--- infix notation
-(>>) = (:∘)
 \end{code}
 
-
-We can understand these substitutions by looking at their behavior on
-type variables (the function |applys| below).
+This algebra allows us to construct a number of substitution actions on types
+from these primitive operations. Intuitively these operations are:
 
 \begin{itemize}
-\item |IdSub| - the identity substitution. When used during substitution,
-    maps all type variables to themselves.
-\item |ty :· s| - extends a substitution by adding a new definition for
+
+\item |Inc n| - A primitive substitution that increments all free variables
+that appear in a type by |n|.\footnote{This substitution is sometimes written
+as |(+n)| or $\uparrow^{n}$.}.
+
+For example
+\begin{spec}
+ghci> subst (Inc 2) (FnTy (VarTy 0) (VarTy 1))
+FnTy (VarTy 2) (VarTy 3)
+\end{spec}
+
+\item |ty :· s| - Extend a substitution by adding a new definition for
     index 0 and shifting everything in |s| one step to the right.
-\item |IncSub n| - increment all variables by |n|.
-  Sometimes written as |(+n)| or  $\uparrow^{n}$
-\item |s2 :∘ s1| - composition
-\item |LiftSub n s| - shift a substitution in preparation
-  to go under a binder, definable in terms of the previous three
+For example
+\begin{spec}
+ghci> subst (BaseTy :· Inc 0) (FnTy (VarTy 0) (VarTy 1))
+FnTy BaseTy (VarTy 0)
+\end{spec}
+
+\item |s1 :∘ s2| - Compose two substitutions together. This is equivalent to
+first substituting by |s1| and then substituting by |s2|.
+
 \end{itemize}
 
-Quotation from Pottier:
-"In short, ↑i t is the term obtained by adding i to every variable that
-appears free in the term t. The symbol ↑i can be intuitively read as an
-end-of-scope mark: it means that the i most-recently-introduced variables are
-not in scope in the term that follows (Bird and Paterson, 1999, Hendriks and
-van Oostrom, 2003)."
-
-Usually the increment operator only works one at a time. But we choose to
-allow a primitive n-ary increment operation. 
-
-The `subst` operation then extends the substitution for a single index
-throughout the type structure. When this function calls itself recursively
-under a binder, it uses `lift` to modify the input substitution.
-In particular |LiftSub| is exactly what we need when we go under a binder.
-With |LiftSub k s|, the indices |0..k-1| are left alone, and
-the free variables in the range of |s| are all incremented by |k|.
+These three substitution operations are all that we need to work with System
+F. For example, we can define an identity substitution by incrementing by
+zero.
 
 \begin{code}
 $(singletons [d|
-              
+    idSub :: Sub
+    idSub = Inc Z      
+    |])
+\end{code}
 
-    -- the value of the de Bruijn index i in the substitution s
-    -- also written as "s !! i"               
-    applys :: Sub -> Nat -> Ty
-    applys IdSub       x = VarTy x
-    applys (e :· s)    x = case x of
-                            Z      -> e
-                            (S m)  -> applys s m
-    applys (IncSub n)  x = VarTy (addNat n x)
-    applys (s1 :∘ s2)  x = subst s2 (applys s1 x)
-    applys (LiftSub n s) x = if x < n 
-                             then VarTy x
-                             else inc n (applys s (subNat x n))
+Furthermore, we can use the cons and identity substitutions to define
+|fromList| the conversion of a list of types to a substitution. In the result,
+the $i$th free variable is replaced by the $i$th type in the list, and all
+other free variables are left alone.
 
+\begin{code}
+$(singletons [d|
+    fromList :: [Ty] -> Sub
+    fromList (t:ts)  = t :· fromList ts
+    fromList []      = Inc Z
+  |])
+\end{code}
+
+Finally, we can define the |lift| substitution, which is exactly what we need
+when working with substitutions under binders.  Using the substitution |lift n
+s|, all free variables in the range |0..n-1| are left alone, and any free
+variables in the range of |s| are all incremented by |n|.
+
+
+\begin{code}
+$(singletons [d|
+    lift :: Nat -> Sub -> Sub
+    lift n s = upTo n (s :∘ Inc n)
+
+    upTo :: Nat -> Sub -> Sub
+    upTo Z      s = s
+    upTo (S m)  s = upTo m (VarTy m :· s)
+    |])
+\end{code}
+
+For example, if have a substitution that replaces 0 with |FnTy (BaseTy) (VarTy
+0)| and leaves all other types alone, we can lift it by two steps to the
+version that leaves variables 0 and 1 alone and replaces variable 2 by
+|(FnTy BaseTy (VarTy 2))|.
+
+\begin{spec}
+ghci> lift 2 ((FnTy BaseTy (VarTy 0)) :· Inc 0)
+VarTy 0 :· (VarTy 1 :· ((FnTy BaseTy (VarTy 0) :· Inc 0) :∘ Inc 2))
+\end{spec}
+
+
+% Quotation from Pottier:
+% "In short, $\uparrow^i t$ is the term obtained by adding $i$ to every variable that
+% appears free in the term $t$. The symbol $\uparrow^i$ can be intuitively read as an
+% end-of-scope mark: it means that the $i$ most-recently-introduced variables are
+% not in scope in the term that follows (Bird and Paterson, 1999, Hendriks and
+% van Oostrom, 2003)."
+
+The main thing we want to do with a substitution |Sub| is apply it to a type.
+Below, we define the opeartion |subst| (which applies a substiution to a type)
+mutually with an operation |applyS| (which looks up the |nth| type in a
+substitution).
+
+The |subst| operation extends the substitution for a single index
+throughout the type structure. When this function calls itself recursively
+under a binder, it uses `lift` to modify the input substitution.
+
+The |applyS| operation dispatches on the substitution algebra. In the base
+case, it increments the index by |n|. For cons, if the index is zero, it
+returns the type |ty|. If not, it decrements the index and looks up the value
+in the substition in the tail.  For composition, it first determines the value
+of the index in the first substitution, then applies the second substitution
+to that type.
+
+\begin{code}
+$(singletons [d|
 
     -- apply a substitution to a type
     subst :: Sub -> Ty -> Ty
     subst s BaseTy        = BaseTy
-    subst s (VarTy x)     = applys s x
+    subst s (VarTy x)     = applyS s x
     subst s (FnTy a r)    = FnTy (subst s a) (subst s r)
-    subst s (PolyTy n a)  = PolyTy n (lift n s a)
+    subst s (PolyTy n a)  = PolyTy n (subst (lift n s) a)
+              
+    -- value of the index x in the substitution s
+    applyS :: Sub -> Nat -> Ty
+    applyS (Inc n)        x  = VarTy (plus n x)           
+    applyS (ty :· s)      x  = case x of
+                                 Z      -> ty
+                                 (S m)  -> applyS s m
+    applyS (s1 :∘ s2)     x  = subst s2 (applyS s1 x)
 
-    -- apply an increment substitution  (\uparrow^n)
-    inc :: Nat -> Ty -> Ty
-    inc n = subst (IncSub n)
-
-    -- apply a lift substitution (\Uparrow^n)
-    lift :: Nat -> Sub -> Ty -> Ty
-    lift n s = subst (LiftSub n s)
-
+               
     |])
-
-instance Index Sub where
-  type Element Sub = Ty
-  s !! x = applys s x
-
 \end{code}
 
+In this definition we are taking advantage of Haskell's lack of termination
+checking. The two functions above are not structurally recursive and would not
+be accepted in this form in languages like Agda and Coq, where all functions
+must be shown terminating. In that setting, this definition must be given in
+stages: first one defines a renaming (which only replaces variables with other
+variables, an operation that is structurally recursive) and then one uses
+renaming to define substitution.
+
+In Haskell, without the obligatio to show termination, we can use the more
+direct implementation above.  (Of course, this lack of termination checking
+means that if a type-level function is not actually terminating, there is a
+danger that the GHC type checker could go into an infinite loop. As
+programmers that behavior is annoying, but not disastrous.)
+
 Even though the singletons library allows us to use higher-order functions,
-like |map| it is not always convenient to do so. For ease, we define names
-for some common maps that we will need later. These names make it easy for
-us to refer to these operations later.
+like |map|, it is not always convenient to reason about the defunctionalized
+symbols that must be given to |map|. For ease, we define names for some common
+operations on lists that we will need later.
 
 \begin{code}
 $(singletons [d|
@@ -426,410 +535,457 @@ $(singletons [d|
     substList s = map (subst s)                                
 
     incList :: Nat -> [Ty] -> [Ty]
-    incList n = map (subst (IncSub n))
+    incList n = map (subst (Inc n))
                
     liftList :: Nat -> Sub -> [Ty] -> [Ty]
-    liftList n s = map (subst (LiftSub n s))
+    liftList n s = map (subst (lift n s))
 
    |])
 \end{code}
 
-\subsection{Stream interpretation}
-
-We can also visualize substitutions as infinite lists of types,
-where the ith type in the list is the substitution for variable i.
-
-\begin{code}
-toList :: Sub -> [Ty]
-toList IdSub         = VarTy <$> [0, 1 ..]
-toList (x :· y)      = x : toList y
-toList (IncSub n)    = VarTy <$> enumFrom n
-toList (s1 :∘ s2)    = substList s2 (toList s1)
-toList (LiftSub Z s) = toList IdSub
-toList (LiftSub (S n) s) =
-  (VarTy <$> [0, 1 .. n]) <> toList (s :∘ IncSub (S n))
-
-\end{code}
-
-We can express the connection between the two interpretations of substitutions
-using the following quickCheck property.  In other words, at any index |n|, the
-result of |applys| is the same as first converting the substitution to a list
-and then accessing the |n|th element.
-
-\begin{code}
-prop_applys_toList :: Sub -> Nat -> Bool
-prop_applys_toList s x =
-  s !! x == toList s !! x
-\end{code}
-
-\subsection{Regular Interpretation}
-
-A \emph{regular substitution} is one of the form
-
-  | t1 :· t2 :· .. :· tk :· IncSub n |
-
-that is, a finite sequence of types followed by |IncSub n|, for some |n|.
-
-All ground substitutions are equivalent to regular substitutions. We should
-be able to compute these things. 
-
-\begin{code}
-tailSub ::Sub -> Sub
-tailSub s = (IncSub 1 :∘ s)
-
-dropSub :: Nat -> Sub -> Sub
-dropSub n s = (IncSub n :∘ s)
-
-prop_drop_inc n x =
-  dropSub n (IncSub 1) !! x == IncSub (S n) !! x
-
-
-liftSub :: Nat -> Sub -> Sub
-liftSub n s = go n (s :∘ IncSub n) where
-        go Z      s = s
-        go (S m)  s = go m (VarTy m :· s)
-\end{code}
-
-We represent a regular substitution by the list of types
-and the amount to increment at the end.
-
-\begin{code}
-data RSub = Reg [Ty] Nat deriving (Eq,Show)
-
--- indexing is just looking up one of the types or
--- shifting by the appropriate amount
-instance Index RSub where
-  type Element RSub = Ty
-  (Reg ts n) !! x = if x < natLength ts then
-                      ts !! x 
-                   else VarTy (n + (x - natLength ts))
-
--- We can convert to/from regular substitutions
-fromReg :: RSub -> Sub
-fromReg (Reg []     x) = IncSub x
-fromReg (Reg (t:ts) x) = t :· fromReg (Reg ts x)
-
-toReg :: Sub -> RSub
-toReg IdSub       = Reg [] 0
-toReg (IncSub n)  = Reg [] n
-toReg (x :· y)    = Reg (x : xs) n
-  where Reg xs n  = toReg y
-toReg (LiftSub n s) = toReg (liftSub n s)
-toReg (s1 :∘ s2) = compReg (toReg s1) (toReg s2)
-
--- Compose two regular substitutions
-compReg :: RSub -> RSub -> RSub
-compReg (Reg [] Z) r2
-  = r2
-compReg (Reg [] xn)    (Reg [] yn)
-  = Reg [] (yn + xn)
-compReg (Reg [] (S n)) (Reg (y:ys) yn)
-  = compReg (Reg [] n) (Reg ys yn)
-compReg (Reg (x:xs) xn) r2
-  = Reg (x':xs') xn'
-     where 
-        x'  = subst (fromReg r2) x
-        Reg xs' xn' = compReg (Reg xs xn) r2
-
-prop_fromReg rs x = rs !! x == fromReg rs !! x
-prop_toReg s x = s !! x == toReg s !! x
-prop_compReg r1 r2 x =
-  compReg r1 r2 !! x == (fromReg r1 :∘ fromReg r2) !! x
-
-
--- Note: just comparing regular forms isn't coarse enough.
--- We could have an "index" in the tail of the list of types.
--- We need to get rid of them somehow
--- But we can still get a derivable, but inefficient equivalence algorithm
--- here
-
-eqSubst s1 s2 = all (\k -> r1 !! k == r2 !! k) [0 .. m]
-  where
-     r1 = toReg s1
-     r2 = toReg s2
-     m  = max (extent r1) (extent r2)
-
-extent :: RSub -> Nat
-extent (Reg ts _) = natLength ts
-
-
--- Question: do we need a type for regular substitutions?
--- can we just use this for "simplifying" substitutions instead?
-\end{code}
-
-
-\subsection{Properties}
-
-Two of the five primitive substitution forms are actually derivable in terms
-of the other three.
-
-In fact, there are many ways to write the identity substitution:
-\begin{code}
-prop_IdSub_def0 n =
-  IdSub !! n    == IncSub 0 !! n
-prop_IdSub_def1 n =
-  IdSub !! n    == (VarTy 0 :· IncSub 1) !! n
-prop_IdSub_def2 n =
-  IdSub !! n    == (VarTy 0 :· VarTy 1 :· IncSub 2) !! n
-prop_IdSub_def3 n =
-  IdSub !! n    == (VarTy 0 :· VarTy 1 :· VarTy 2 :· IncSub 3) !! n
-\end{code}
-
-Lifting also follows a similar pattern.
-
-\begin{code}
-prop_LiftSub0 s x =
-  LiftSub 0 s !! x == (s :∘ IncSub 0) !! x
-prop_LiftSub1 s x =
-  LiftSub 1 s !! x == (VarTy 0 :· (s :∘ IncSub 1)) !! x
-prop_LiftSub2 s x =
-  LiftSub 2 s !! x == (VarTy 0 :· VarTy 1 :· (s :∘ IncSub 2)) !! x
-
--- more generally
-prop_LiftSub_def k s x =
-  LiftSub k s !! x == liftSub k s !! x
-\end{code}
-
-\subsection{Axiomatization for substitutions}
-
-Shaefer et al give eight axioms about the equivalence of substitions.
-The first follow directly from our definition of |subst| above.
-
-The remainder are extensional equalities about substitutions:
-\begin{code}
-prop_Shift0 s x =
-  (IncSub Z :∘ s) !! x == s !! x
-  
-prop_ShiftCons n t s x =
-  (IncSub (S n) :∘ (t :· s)) !! x == (IncSub n :∘ s) !! x
-
-prop_IdL s x =
-  (IdSub :∘ s) !! x == s !! x
-
-prop_IdR s x =
-  (s :∘ IdSub) !! x == s !! x
-
-prop_Ass s1 s2 s3 x =
-  ((s1 :∘ s2) :∘ s3) !! x == (s1  :∘ (s2 :∘ s3)) !! x
-
-prop_Map t s1 s2 x =
-  ((t :· s1) :∘ s2) !! x == ((subst s2 t) :· (s1 :∘ s2)) !! x
-
-\end{code}
-
-\subsection{Simplification}
-
-Unfortunately, we cannot normalize terms containing substitution expressions
-because we don't have "explicit" substitutions. In otherwords we cannot write
-type-level functions that dispatch on what substitutions have been applied to
-|Ty| expressions.
-
-It's actually a good thing that we can't do that because we want to have
-unique forms for types. 
-
-\begin{code}
--- Simplifications
-asimpl :: Sub -> Sub
--- IdL 
-asimpl (IdSub :∘ s) = s
--- IdR
-asimpl (s :∘ IdSub) = s
--- ShiftCons
-asimpl (IncSub Z     :∘ s)        = asimpl s
-asimpl (IncSub (S n) :∘ (t :· s)) = asimpl (IncSub n :∘s)
--- Map
-asimpl ((t :· s1) :∘ s2) =
-  (subst s2 t) :· (asimpl (s1 :∘ s2))
--- Ass  
-asimpl ((s1 :∘ s2) :∘ s3) =
-  s1  :∘ (asimpl (s2 :∘ s3))
-  
--- VarShift (how to generalize?)
-asimpl (VarTy 0 :· IncSub 1) = IdSub
-asimpl (VarTy 0 :· VarTy 1 :· IncSub 2) = IdSub
-
--- New for n-ary Inc
-asimpl (IncSub 0) = IdSub
-asimpl (IncSub n :∘ IncSub k) = IncSub (n + k)
-
-asimpl s = s
-
-prop_asimpl s n = s !! n == asimpl s !! n 
-\end{code}
-
-\paragraph{Interlude: Lemmas from autosubst}
-
-NOTE: autosubst notation
-|IdSub|        is  |ids|
-|ConsSub t s|  is  |t .: s|
-|LiftSub 1 s|  is  |up s|
-|IncSub 1|     is  |ren (+1)|
-|CompSub s1 s2| is |s1 >> s2|
-
-The substitution "up σ" is equal to
-Var 0 .: (σ >> ren (+1)) where (+1) is the renaming increasing every variable by
-one and .: is the stream-cons operator.
-
-
-The autosubst library automatically generates four substitution lemmas.
-\cite{autosubst-manual}. One of these lemmas states that renaming
-is equal to substitution, so is not pertinent in this context.
-
-However, we can translate the remaining three lemmas to this framework:
-
-\begin{spec}
-subst_comp : forall t s1 s2. subst s2 (subst s1 t) = subst (s1 >> s2) t
-subst_id   : forall t. subst IdSub t = t
-id_subst   : forall x t. subst s (IdSub !! x) = s !! x
-\end{spec}
-
-About subst_comp: "This property is essential and surprisingly difficult to
-show if done manually."
-
-\begin{code}
-prop_subst_id t = subst IdSub t == t
-\end{code}
-
-\section{Terms and types}
+\section{Strongly-typed Expressions}
 
 Now, in this section, use the promoted, quantified types to develop an
 intrinsically-typed version of System F.
 
-Before we do so, we need two additional operations on substitutions.
+The GADTs |Exp g t| below represents terms. This data structures is indexed by
+|g|, a context (i.e. list of types for the free variables of the term) and the
+type of the System F expression |t|.  As with types above, we represent
+variables by natural number indices in the |VarE| constructor. However, this
+constructor comes with a requirement that the index |n| can be used to lookup
+the \emph{nth} type in the context. In other words, the variable constructor
+ensures that expression variables are in scope.
 
-First, we need a way to interpret a list of types as a substitution,
-where the first element of the list is the substition for TyVar 0,
-etc. We do so, with the following unremarkable function.
+The constructors for lambda abstraction and application are straightforward
+for this representation --- in the lambda case, the context includes the type
+of the variable bound by the function. In an application, the argument must
+have the same type as that expected by the function.
+
+The |TyLam| and |TyApp| constructors represent n-ary type abstraction and
+application. In the former case, all variables in the context used to type
+check the body of the type abstraction must be incremented by |n|, the number
+of type variables bound in the type abstraction.  The |TyApp| case is as
+described above.
+
 
 \begin{code}
-$(singletons [d|
-  fromList :: [Ty] -> Sub
-  fromList = foldr (:·) IdSub
-  |])
-\end{code}
-
-\begin{code}
-prop_toList_fromList tys =
-  take (length tys) (toList (fromList tys)) == tys
-\end{code}
-
-Second, we give a name to the operation of mapping the increment operation
-across a list of types.
-
-\begin{code}
-$(singletons [d|
-   |])
-\end{code}
-
-With these two operations, we can define the GADTs for terms, indexed by a
-context (i.e. list of types for the free variables of the term) and the type
-of the term.
-
-The `Sing a` type, defined in the singletons library, indicates the use of
-dependent types. These are arguments that are used both as data (so must be
-args to the data constructors) but also must appear later in the type. For 
-
-
-In this term, the `TyLam` operation has to increment all of the type variables
-in the context `g` by `k`, the number of type binders.  In the `TyApp` case,
-we need to know that the number of binders in the polymorphic function matches
-the number of type arguments. We then turn the type arguments into a
-substitution which we use to calculate the result type.
-
-\begin{code}
-
-data Var :: [Ty] -> Ty -> Type where
-  VZ  :: Var (ty:g) ty
-  VS  :: Var g ty -> Var (ty1:g) ty
-
 data Exp :: [Ty] -> Ty -> Type where
   
-  EBase  :: Exp g BaseTy
+  BaseE  :: Exp g BaseTy
   
-  EVar   :: Var g ty
-         -> Exp g ty
+  VarE   :: (Idx g n ~ Just t)    -- scope requirement
+         => Sing n                -- variable index
+         -> Exp g t
          
-  ELam   :: Sing ty1
-         -> Exp (ty1:g) ty2
-         -> Exp g (FnTy ty1 ty2)
+  LamE   :: Sing t1               -- type of binder
+         -> Exp (t1:g) t2         -- body of abstraction
+         -> Exp g (FnTy t1 t2)
          
-  EApp   :: Exp g (FnTy ty1 ty2)
-         -> Exp g ty1
-         -> Exp g ty2
+  AppE   :: Exp g (FnTy t1 t2)    -- function
+         -> Exp g t1              -- argument
+         -> Exp g t2
   
-  TyLam  :: Sing k
-         -> Exp (IncList k g) ty
-         -> Exp g (PolyTy k ty)
-         
-  TyApp  :: (k ~ NatLength tys)
-         => Exp g (PolyTy k ty)
-         -> Sing tys
-         -> Exp g (Subst (FromList tys) ty)
-         
+  TyLam  :: Sing n                -- num of tyvars to bind
+         -> Exp (IncList n g) t   -- body of type abstraction
+         -> Exp g (PolyTy n t)
+
+  TyApp  :: (k ~ Length ts)       -- length requirement
+         => Exp g (PolyTy k t)    -- polymorphic term
+         -> Sing ts               -- type arguments
+         -> Exp g (Subst (FromList ts) t)
+
+data Var g t where
+  V :: (Idx g n ~ Just t) => Sing n -> Var g t         
 \end{code}
 
-For example, we can type check the polymorphic identity function:
-
-\begin{code}
-$(singletons [d|
-     sid :: Ty
-     sid = (PolyTy (S Z) (FnTy (VarTy Z) (VarTy Z)))
- |])
-
-pid :: Exp '[] Sid
-pid = TyLam (SS SZ) (ELam (SVarTy SZ) (EVar VZ))
-
-pidpid :: Exp '[] Sid
-pidpid = EApp (TyApp pid (SCons sSid SNil)) pid
-\end{code}
-
-
-\subsection{Substituting terms in types}
-
-The next step is to define the operation of type substitution in terms.
-
-Again, we name some operations that we would like to use with type contexts.
-
-
-
-
-In this definition, instead of using the simply-typed version of these operations,
-we need to use some Singletons to capture the dependency. For example, the operation
+For example, we can use this expression to typecheck
+the polymorphic identity function
 
 \begin{spec}
-sSubst :: Sing s -> Sing ty -> Sing (Subst s ty)
+ghci> :type TyLam (SS SZ) (LamE (SVarTy SZ) (VarE SZ))
+  :: Exp g (PolyTy (S Z)
+            (FnTy (VarTy Z) (VarTy Z)))
 \end{spec}
 
-is the dependent version of `subst` above. i.e. the process of applying a substitution
-to a type. We need to use this operation in the lambda case, because we need to substitute
-in the type annotations.
+This example works because expressions are annotated with runtime
+representation of System F types. Haskell's type inference has enough
+information to figure out the type of the term from the derivation.
+
+In contrast, expressions that don't type check in System F are also ill-typed
+in Haskell.
+\begin{spec}
+ghci> TODO!!!
+\end{spec}
+
+We can also dynamically produce the type of a well-typed expression, as long
+as we have a runtime representation of the context so that we can calculate
+the type of free variables. (We are not type checking with this function, only
+recovering the type from a term that is known to be type correct.)
 
 \begin{code}
--- Substitute types in terms
-substTy :: forall s g ty. Sing s -> Exp g ty -> Exp (SubstList s g) (Subst s ty)
-substTy s EBase         = EBase
-substTy s (EVar v)      = EVar (substVar @s v)
-substTy s (ELam ty e)   = ELam (sSubst s ty) (substTy s e)
-substTy s (EApp e1 e2)  = EApp (substTy s e1) (substTy s e2)
+typeOf :: Sing g -> Exp g t -> Sing t
+typeOf g (VarE v)       =
+  case sIdx g v of
+    SJust t -> t
+typeOf g BaseE          =
+  SBaseTy
+typeOf g (LamE t1 e)    =
+  SFnTy t1 (typeOf (SCons t1 g) e)
+typeOf g (AppE e1 e2)   =
+  case typeOf g e1 of
+    SFnTy _ t2 -> t2
+typeOf g (TyLam n e)    =
+  SPolyTy n (typeOf (sIncList n g) e)
+typeOf g (TyApp e tys)  =
+  case typeOf g e of
+    SPolyTy _ t1 -> sSubst (sFromList tys) t1
+\end{code}
+
+Because we know that the term type checks, Haskell's pattern match coverage
+checker does not complain about the three pattern matches in the function
+above. In each case there is only one possible pattern that type checks.
+
+Note also above that we use the singleton-ized versions of many operations
+(such as the |incList|, |subst| and |fromList| functions defined above).
+
+\begin{spec}
+sIdx       :: Sing l -> Sing n  -> Sing (Idx l n)
+sSubst     :: Sing s -> Sing ty -> Sing (Subst s ty)
+sIncList   :: Sing n -> Sing g  -> Sing (IncList n g)
+sFromList  :: Sing tys -> Sing (FromList tys)
+\end{spec}
+
+The |idx| function, defined in the natural number library determines the $i$th
+element of a list, returning either |Nothing| or |Just x|. So the
+singleton-ized version returns either |SNothing| or |SJust|.  However, in the
+|VarE| case, the restriction on the type constructor means that we know that
+the indexing operation will succeed. The type checker can tell that the
+pattern match in this case is exhaustive.
+
+\subsection{Type substitution in terms: version1}
+
+The next step is to define the operation for type substitution in terms.  This
+operation is challenging to define because we need to show that terms stay
+well typed even under substitution. To write this function, we need to tell
+the Haskell type checker four facts about about the type substitution
+operation.  We communicate this information via \emph{lemma}s; i.e. functions
+that return a evidence of equality between two types that Haskell would not
+otherwise know equivalent. This evidence comes in the form of |Refl|, the sole
+data constructor of the Haskell GADT |a :~: b|, a proposition that two types
+are equal.
+
+\begin{code}
+substTy1 :: forall s g ty.
+     Sing s
+  -> Sing g
+  -> Exp g ty
+  -> Exp (SubstList s g) (Subst s ty)
+substTy1 s g (VarE n)
+  -- fact about substitution in contexts, see below
+  |  Refl <- lemma_SubstIdx g n s
+  =  VarE n
+substTy1 s g BaseE
+  = BaseE  
+substTy1 s g (LamE ty e)
+  = LamE (sSubst s ty) (substTy1 s (SCons ty g) e)
+substTy1 s g (AppE e1 e2)
+  = AppE (substTy1 s g e1) (substTy1 s g e2)
+
+substTy1 s g (TyLam k e)
+  |  Refl <- lemma_LiftIncList s k g
+  =  TyLam k (substTy1 (sLift k s) (sIncList k g) e)
+  
+substTy1 s g (TyApp (e :: Exp g (PolyTy k ty1)) tys)
+  |  Refl <- lemma_SubstFromList @ty1 s tys
+  ,  Refl <- lemma_LengthSubstList s tys
+  = TyApp (substTy1 s g e) (sSubstList s tys)
+\end{code}
+
+
+In the first case of |substTy1|, we need to show that substituting through
+variable lookups is type-sound.  The fact that we need to show in this case is
+not a difficult "proof" to write in Haskell. Essentially the proof is an
+induction on the index |n|.
+
+\begin{code}
+lemma_SubstIdx :: (Idx g n ~ Just t) =>
+  Sing g -> Sing n -> Sing s ->
+  Idx (SubstList s g) n :~: Just (Subst s t)
+lemma_SubstIdx (SCons _ _)   SZ     s
+  = Refl
+lemma_SubstIdx (SCons _ xs)  (SS n) s
+  | Refl <- lemma_SubstIdx xs n s
+  = Refl
+\end{code}
+
+The last two branches of substTy requires more traditional proofs about type
+equality.  
+
+In the |TyLam| case, we call the function recursively after shifting
+the substitution by the number of binders in the abstraction.
+
+we have
+
+\begin{spec}
+   substTy1 (sLift k s) .. e ::
+       Exp (SubstList (Lift k s) g) (Subst (Lift k s) ty)
+\end{spec}
+
+we want to produce a term of type
+
+\begin{spec}
+   Exp s (Subst s g) (Subst s (PolyTy k ty))
+   ==
+   Exp s (Subst s g) (PolyTy k (Subst (Lift k s) ty))
+\end{spec}
+
+we can do so with the TyLam, given a body of type
+
+\begin{spec}
+   Exp s (IncList k (Subst s g)) (Subst (Lift k s) ty)
+\end{spec}
+
+so the type of the body lines up. But we need a type equality between the
+contexts.
+
+
+The other three lemmas are also provable.
+
+\begin{spec}
+lemma_LiftIncList :: forall s k g.
+  Sing s -> Sing k -> Sing g -> 
+  LiftList k s (IncList k g) :~: IncList k (SubstList s g)
+
+lemma_SubstFromList :: forall ty1 s tys.
+  Sing s -> Sing tys ->
+  Subst (FromList (SubstList s tys))
+    (Subst (Lift (Length tys) s) ty1)
+     :~: 
+  Subst s (Subst (FromList tys) ty1)
+
+lemma_LengthSubstList :: forall s tys.
+  Sing s -> Sing tys ->
+  Length (SubstList s tys) :~: Length tys
+\end{spec}
+
+%if False
+\begin{code}
+lemma_LiftIncList :: forall s k g.
+  Sing s -> Sing k -> Sing g -> 
+  LiftList k s (IncList k g) :~: IncList k (SubstList s g)
+lemma_LiftIncList s k SNil = Refl
+lemma_LiftIncList s k (SCons (t :: Sing t) (ts :: Sing ts)) 
+  | Refl <- lemma_LiftInc s k t
+  , Refl <- lemma_LiftIncList s k ts
+  = Refl
+\end{code}
+
+\begin{code}
+-- helper function for above
+lemma_LiftInc :: forall t s k.
+  Sing s -> Sing k -> Sing t ->
+  Subst (Lift k s) (Subst (Inc k) t) :~: Subst (Inc k) (Subst s t)
+lemma_LiftInc s k (SVarTy n)
+  | Refl <- lemma_UpTo s k n
+  = Refl
+lemma_LiftInc s k (SFnTy t1 t2)
+  | Refl <- lemma_LiftInc s k t1
+  , Refl <- lemma_LiftInc s k t2
+  = Refl
+lemma_LiftInc s k SBaseTy
+  = Refl
+lemma_LiftInc s k (SPolyTy n t)
+  | Refl <- lemma_LiftInc s k t
+  = undefined -- TODO!!!
+
+lemma_UpTo :: Sing s -> Sing k -> Sing n ->
+  ApplyS (UpTo k (s :∘ Inc k)) (Plus k n)
+  :~: Subst (Inc k) (ApplyS s n)  
+lemma_UpTo s SZ n = Refl
+lemma_UpTo s (SS m) n 
+  | Refl <- lemma_UpTo s m n
+  = undefined -- TODO!!!
+\end{code}
+
+\begin{code}
+lemma_SubstFromList :: forall ty1 s tys.
+  Sing s -> Sing tys ->
+  Subst (FromList (SubstList s tys))
+    (Subst (Lift (Length tys) s) ty1)
+     :~: 
+  Subst s (Subst (FromList tys) ty1)
+lemma_SubstFromList s SNil = undefined
+lemma_SubstFromList s (SCons ty s1) = undefined
+
+lemma_SubstId :: forall t.
+  Sing t ->
+  Subst (Inc Z) t :~: t
+lemma_SubstId SBaseTy = Refl
+lemma_SubstId (SFnTy t1 t2)
+  | Refl <- lemma_SubstId t1
+  , Refl <- lemma_SubstId t2
+  = Refl
+lemma_SubstId (SVarTy x) = Refl
+lemma_SubstId (SPolyTy k t) 
+  | Refl <- lemma_SubstLiftId k t
+  = Refl
+
+lemma_SubstLiftId :: forall n t.
+   Sing n -> Sing t -> 
+   Subst (UpTo n (Inc Z :∘ Inc n)) t :~: t
+lemma_SubstLiftId _ _ = undefined -- TODO!!!
+\end{code}
+
+%endif
+
+However, Haskell is not a good language for this sort of proof. The error
+messages are terrible. There is no library of pre-existing theories to draw
+on. Even worse, we have to "run" this proof. (And being able to run the proof
+also forces us to require a |Sing g| argument to |substTy1|; which we would
+not need otherwise.)
+
+\subsection{Type substitution: version 2}
+
+This is not what we want to do.  Instead, we should just \emph{inform} GHC of
+the type equality and justify it through other means. We can inform GHC by
+defining an ``axiom'', essentially a function that skirts the type system to
+produce the ``evidence'' for equality. The axiom below can be used in the same
+way as the lemma above --- but note that it doesn't evaluate any of its
+arguments.
+
+\begin{code}
+axiom_SubstIdx :: (Idx g n ~ Just t) =>
+  Sing g -> Sing n -> Sing s ->
+  Idx (SubstList s g) n :~: Just (Subst s t)
+axiom_SubstIdx _g _n _s = unsafeCoerce Refl
+\end{code}
+
+%if False
+\begin{code}
+axiom_LiftIncList :: forall s k g.
+  Sing s -> Sing k -> Sing g -> 
+  LiftList k s (IncList k g) :~: IncList k (SubstList s g)
+axiom_LiftIncList _ _ _ = unsafeCoerce Refl
+
+axiom_SubstFromList :: forall ty1 s tys.
+  Sing s -> Sing tys ->
+  Subst (FromList (SubstList s tys))
+    (Subst (Lift (Length tys) s) ty1)
+     :~: 
+  Subst s (Subst (FromList tys) ty1)
+axiom_SubstFromList _ _ = unsafeCoerce Refl
+
+axiom_LengthSubstList :: forall s tys.
+  Sing s -> Sing tys ->
+  Length (SubstList s tys) :~: Length tys
+axiom_LengthSubstList _ _ = unsafeCoerce Refl  
+\end{code}
+%endif
+
+With the help of this axiom, we can produce another leaner version of
+|substTy| that does no more work than necessary. All of the axioms immediately
+return. Furthermore, because none are strict in their arguments, we need not
+provide a runtime representation of the typing context to this function
+(i.e. an argument of type |Sing g|).
+
+\begin{code}
+substTy :: forall s g ty.
+     Sing s 
+  -> Exp g ty
+  -> Exp (SubstList s g) (Subst s ty)
+substTy s (VarE n) 
+  |  Refl <- axiom_SubstIdx (undefined :: Sing g) n s
+  =  VarE n
+substTy s BaseE         = BaseE  
+substTy s (LamE ty e)   = LamE (sSubst s ty) (substTy s e)
+substTy s (AppE e1 e2)  = AppE (substTy s e1) (substTy s  e2)
+
 substTy s (TyLam k e)
-  | Refl <- axiom_LiftIncList1 @g s k
-  = TyLam k (substTy (SLiftSub k s) e)
+  |  Refl <- axiom_LiftIncList s k (undefined :: Sing g)
+  =  TyLam k (substTy (sLift k s) e)
   
 substTy s (TyApp (e :: Exp g (PolyTy k ty1)) tys)
-  | Refl <- typeEquality2 @ty1 s tys
-  , Refl <- typeEquality3 @(SubstSym1 s) tys
-  = TyApp (substTy s e) (sSubstList s tys)
+  |  Refl <- axiom_SubstFromList @ty1 s tys 
+  ,  Refl <- axiom_LengthSubstList s tys 
+  =   TyApp (substTy s e) (sSubstList s tys)
 \end{code}
 
 
-In the first case of the function, we need to show that substituting through
-variable lookups is type-sound.
+\section{Justifying axioms}
+
+But, what is our justification for these axiom? Why should we allow these
+instances of |unsafeCoerce| in our code? Shouldn't we worry that our Haskell
+code could crash?
+
+
+\paragraph{External proof of termination for Haskell proof}
+
+One way to justify an axiom is to look at the Haskell proof and rigourously
+argue (on paper) that the function will terminate.
+
+For example, the proof of the last lemma is a simple structural recursion on
+the list of types.  This function will terminate as long as the provided list
+is finite.
 
 \begin{code}
-substVar :: forall s g ty. Var g ty -> Var (SubstList s g) (Subst s ty)
-substVar VZ      = VZ
-substVar (VS v)  = VS (substVar @s v)
+lemma_LengthSubstList :: forall s tys.
+  Sing s -> Sing tys ->
+  Length (SubstList s tys) :~: Length tys
+lemma_LengthSubstList _ SNil = Refl
+lemma_LengthSubstList s (SCons t1 s1)
+  | Refl <- lemma_LengthSubstList s s1
+  = Refl
 \end{code}
+
+An System F type application term with an infinite list of types will never
+type check, so we can be confident that this equality will hold.
+
+\paragraph{External proof of the property}
+
+Some of the properties above are \emph{hard} to prove. Another alternative is
+to translate them to Agda or Coq and try to prove them there.
+
+TODO: describe how this could be done
+
+\paragraph{Testing}
+
+The final way that we can gain confidence about these type equalities is
+through testing, and activity where Haskell excels.
+
+For each of the axioms above, we can define QuickCheck properties that refer
+to the non-singletonized versions of the operations. Because these are simple
+datatypes, we only need to define instances of the |Arbitrary| type class for
+the datatypes |Sub| and |Ty| to be able to run these tests.
+
+\begin{code}
+prop_SubstIdx :: [Ty] -> Nat -> Sub -> Bool
+prop_SubstIdx g n s =
+    idx (substList s g) n == (subst s <$> idx g n)
+\end{code}
+
+\begin{code}
+prop_LiftIncList :: [Ty] -> Sub -> Nat -> Bool
+prop_LiftIncList g s k =
+    liftList k s (incList k g) == incList k (substList s g)
+\end{code}
+
+\begin{code}
+prop_SubstFromList :: Ty -> Sub -> [Ty] -> Bool
+prop_SubstFromList ty1 s tys =
+  subst (fromList (substList s tys))
+    (subst (lift (length tys) s) ty1)
+    ==
+  subst s (subst (fromList tys) ty1)
+\end{code}
+
+\begin{code}
+prop_LengthSubstList :: Sub -> [Ty] -> Bool
+prop_LengthSubstList s tys =
+  length (substList s tys) == length tys
+\end{code}
+
+
+%if False
 
 Note that this function is more proof than code --- if you look at it, it is
 just an identity function.  It is justified to replace the above with the
@@ -860,63 +1016,35 @@ substVar :: Sing s -> (Var g ty) -> Var (SubstList s g) (Subst s ty)
 substVar s v = coerce v
 \end{spec}
 
-The last two branches of substTy requires more traditional proofs about type
-equality.  (A version in Coq or Agda would also need to rely on these proofs.)
-
-In the type abstraction case, we call the function recursively after shifting
-the substitution by the number of binders in the abstraction.
-
-we have
-
-\begin{spec}
-   substTy (SLiftSub k s) e ::
-       Exp (SubstList (LiftSub k s) g) (Subst (LiftSub k s) ty)
-\end{spec}
-
-we want to produce a term of type
-
-\begin{spec}
-   Exp s (Subst s g) (Subst s (PolyTy k ty))
-   ==
-   Exp s (Subst s g) (PolyTy k (Subst (LiftSub k s) ty))
-\end{spec}
-
-we can do so with the TyLam, given a body of type
-
-\begin{spec}
-   Exp s (IncList k (Subst s g)) (Subst (LiftSub k s) ty)
-\end{spec}
-
-so the type of the body lines up. But we need a type equality between the
-contexts.
 
 \begin{code}
-axiom_LiftInc :: forall g s k.
-  Sing s -> Sing k -> Subst (LiftSub k s) (Subst (IncSub k) g)
-  :~: Subst (IncSub k) (Subst s g)
-axiom_LiftInc _ _ = unsafeCoerce Refl
+ax_subst_comp :: forall s1 s2 t.
+  Subst (s1 :∘ s2) t :~: Subst s2 (Subst s1 t)
+ax_subst_comp = unsafeCoerce Refl
 
-axiom_LiftIncList1 :: forall g s k.
-  Sing s -> Sing k -> LiftList k s (IncList k g) :~: IncList k (SubstList s g)
-axiom_LiftIncList1 _ _ = unsafeCoerce Refl
+ax_subst_id :: forall t. Subst IdSub t :~: t
+ax_subst_id = unsafeCoerce Refl
 \end{code}
+
+
 
 Why is this equality justfied? Consider what happens in the case of some type variable
 k1, that occurs in one type in the list. In this case, we need to show that 
 
-  Subst (LiftSub k s) (Subst (IncSub k) (VarTy k1))  :~: Subst (IncSub k) (Subst s (VarTy k1))
+  Subst (Lift k s) (Subst (Inc k) (VarTy k1))
+  :~: Subst (Inc k) (Subst s (VarTy k1))
 
 So we have the following sequence of equalities connecting the left-hand-side with the
 right-hand side.
 
 \begin{spec}
-   LHS  == Subst (LiftSub k s) (VarTy (AddNat k k1))
+   LHS  == Subst (Lift k s) (VarTy (Plus k k1))
          {{ unfolding definitions }}
-        == if (AddNat k k1) < k 
-             then VarTy (AddNat k k1)
-             else inc k s !! (subNat (AddNat k k1) k)
+        == if (Plus k k1) < k 
+             then VarTy (Plus k k1)
+             else inc k s !! (sub (Plus k k1) k)
          {{ first case is impossible }}
-        == inc k s !! (subNat (AddNat k k1) k)
+        == inc k s !! (sub (Plus k k1) k)
          {{ arithmetic }}
         == inc k (s !! k1)
          {{ unfolding definitions }}
@@ -932,577 +1060,335 @@ prove it on paper, or in an external tool, or in LiquidHaskell. However, it is
 simpler to test it via quickCheck.  So, let's state it as a quickcheck
 property.
 
+%endif
+
+
+\section{Term substitution}
+
+Next, we need to define substitition for expression variables. In this case,
+the definitions are similar to above, but with two significant changes.
+
+First, term substitutions are more informatively typed than type
+substitutions. Because they apply to well-typed expressions, they need to
+statically track the transformation of the environment during substitution.
+
+Second, instead of bunching up increments by providing a natural number to
+|Inc|, we instead only allow one increment at a time. We make this change to
+account for the significant increase in complexity that comes from indexing
+the types of substitutions by their associated contexts.  As a result, we need
+to also provide an indendenty substitution for incrementing by zero.
+\footnote{This implementation is less efficient, as it stores increments in unary.}
+
 \begin{code}
-prop_LiftIncList1 :: [Ty] -> Sub -> Nat -> Bool
-prop_LiftIncList1 g s k = liftList k s (incList k g) == incList k (substList s g)
+data SubE g g' where
+  IdE    :: SubE g g
+  IncE   :: SubE g (ty:g)
+  ConsE  :: Exp g' ty -> SubE g g' -> SubE (ty:g) g'
+  CompE  :: SubE g1 g2 -> SubE g2 g3 -> SubE g1 g3
+\end{code}
+
+As before, we can define the ``lifting'' operation that appropriately modifies
+the substitution for traversing under binders. However, we only ever bind one
+variable at a time in expressions, so our lifting operation only ``lifts'' the
+substitution by one index.
+
+\begin{code}
+liftE1    :: SubE g g' -> SubE (ty:g) (ty:g')
+liftE1 s   = ConsE (VarE SZ) (CompE s IncE)
+\end{code}
+
+In contrast, when we traverse under a type binder, we bind a list of type
+variables. Therefore, we need the following operation that increments the
+indices of free type variables stored in the substitution.  Here, we see the
+benefit in working with a concrete representation of substitution as compared
+to higher-order functions --- we can define this operation directly over the
+structure of the substitution.
+
+\begin{code}
+incSubE  :: Sing k
+         -> SubE g g'
+         -> SubE (IncList k g) (IncList k g')
+incSubE k IdE             = IdE
+incSubE k IncE            = IncE
+incSubE k (ConsE e s)     =
+  ConsE (substTy (SInc k) e) (incSubE k s)
+incSubE k (CompE s1 s2)   =
+  CompE (incSubE k s1) (incSubE k s2)
+\end{code}
+
+With these two operations, we can define the term substitution operation. In
+the case of variables, this operation dispatches to a helper function that
+looks up the value of the variable in the substitution. (Compare |applyES|
+below with |applyE| above.) Otherwise, the substitution function works
+homemomorphically over the structure of expressions, using the |liftE1| and
+|incSubE| functions above to modify the substitution when traversing under
+binders.
+
+\begin{code}
+substE  :: SubE g g' -> Exp g ty
+        -> Exp g' ty
+substE s BaseE          = BaseE
+substE s (VarE v)       = applyES s v
+substE s (AppE e1 e2)   = AppE (substE s e1) (substE s e2)
+substE s (LamE ty e)    = LamE ty (substE (liftE1 s) e)
+substE s (TyLam k e)    = TyLam k (substE (incSubE k s) e)
+substE s (TyApp e tys)  = TyApp (substE s e) tys
+
+applyES  :: (Idx g n ~ Just ty)
+         => SubE g g' -> Sing n -> Exp g' ty
+applyES IdE            v       = VarE v
+applyES IncE           v       = VarE (SS v)
+applyES (ConsE e s)    SZ      = e
+applyES (ConsE e s)    (SS m)  = applyES s m
+applyES (CompE s1 s2)  v       = substE s2 (applyES s1 v)
+\end{code}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%if False
+\subsection{Stream interpretation}
+
+We can visualize substitutions as infinite lists of types, where the ith type
+in the list is the substitution for variable i.
+
+\begin{code}
+instance Index Sub where
+  type Element Sub = Ty
+  s !! x = applyS s x
+\end{code}
+
+\begin{code}
+instance Enum Ty where
+  toEnum x = VarTy (toEnum x)
+  fromEnum (VarTy x) = fromEnum x
+  fromEnum _ = error "cannot do it"
 \end{code}
 
 
+\begin{code}
+toList :: Sub -> [Ty]
+toList (x :· y)           = x : toList y
+toList (Inc n)            = [VarTy n, VarTy (n + 1) ..]
+toList (s1 :∘ s2)         = substList s2 (toList s1)
+\end{code}
+
+We can express the connection between the two interpretations of substitutions
+using the following quickCheck property.  In other words, at any index |n|, the
+result of |applyS| is the same as first converting the substitution to a list
+and then accessing the |n|th element.
 
 \begin{code}
-typeEquality2 :: forall ty1 s tys.
-  Sing s -> Sing tys ->
-  Subst (FromList (SubstList s tys))
-    (Subst (LiftSub (NatLength tys) s) ty1)
-     :~: 
-  Subst s (Subst (FromList tys) ty1)
-typeEquality2 _ _ = unsafeCoerce Refl
+prop_applyS_toList :: Sub -> Nat -> Bool
+prop_applyS_toList s x =
+  s !! x == toList s !! x
+\end{code}
 
-prop2 :: Ty -> Sub -> [Ty] -> Bool
-prop2 ty1 s tys =
-  subst (fromList (substList s tys))
-    (lift (natLength tys) s ty1)
-    ==
-  subst s (subst (fromList tys) ty1)
+(Note: in our first version of this function, quick check did not catch a bug
+in the |Lift Z s| case even with a 1000 tests.)
 
-
-typeEquality3 :: forall f tys.
-  Sing tys ->
-  NatLength (Map f tys) :~: NatLength tys
-typeEquality3 _ = unsafeCoerce Refl
-
-prop3 :: (a -> b) -> [a] -> Bool
-prop3 f tys = natLength (map f tys) == natLength tys
-
+\begin{code}
+prop_toList_fromList tys =
+  take (length tys) (toList (fromList tys)) == tys
 \end{code}
 
 
+%endif
 
-\subsection{Term substitutions}
 
-i.e. all this substitution stuff *again*, but more intrinsically typed. 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+
+%if False
+
+This is the polymorphic function specialization. 
 
 \begin{code}
-data ESub g g' where
-  EIdSub   :: ESub g g
-  EConsSub :: Exp g' ty -> ESub g g' -> ESub (ty:g) g'
-  ETailSub :: ESub (ty:g) g' -> ESub g g'
-  EIncSub  :: ESub g (ty:g)
-  ELiftSub :: ESub g g' -> ESub (ty:g) (ty:g')
 
-----------------
-applyESub :: ESub g g' -> Var g ty -> Exp g' ty
-applyESub EIdSub         v = EVar v
-applyESub (EConsSub e s) v = case v of
-                                VZ -> e
-                                VS m -> applyESub s m
-applyESub (ETailSub s)   v = applyESub s (VS v)
-applyESub EIncSub        v = EVar (VS v)
-applyESub (ELiftSub s)   v = case v of
-                                VZ -> EVar VZ
-                                VS m -> substE EIncSub (applyESub s m)
+prop_substFreshList g k tys =
+  ((k <= length tys) == False)  ==>
+  substList (fromList tys) (incList k g) == (incList (k - (length tys)) g)
 
----------------------
+ax_SubstFreshList :: forall g k tys.
+  ((k <= Length tys) ~ False) =>
+  SubstList (FromList tys) (IncList k g) :~:
+  IncList (Minus k (Length tys)) g
+ax_SubstFreshList = unsafeCoerce Refl
 
--- Composition of type-increment and term substitution.
--- Kinda nice that we have a concrete definition of term substitutions
--- to work from.
-incESub :: Sing k -> ESub g g' -> ESub (IncList k g) (IncList k g')
-incESub k EIdSub         = EIdSub
-incESub k (EConsSub e s) = EConsSub (substTy (SIncSub k) e) (incESub k s)
-incESub k (ETailSub s)   = ETailSub (incESub k s)
-incESub k EIncSub        = EIncSub
-incESub k (ELiftSub s)   = ELiftSub (incESub k s)
-
----------------------
-
-substE :: ESub g g' -> Exp g ty -> Exp g' ty
-substE s EBase         = EBase
-substE s (EVar v)      = applyESub s v
-substE s (EApp e1 e2)  = EApp (substE s e1) (substE s e2)
-substE s (ELam ty e)   = ELam ty (substE (ELiftSub s) e)
-substE s (TyLam k e)   = TyLam k (substE (incESub k s) e)
-substE s (TyApp e tys) = TyApp (substE s e) tys
+ax_SubstFresh :: forall t k tys.
+  ((k <= Length tys) ~ False) =>
+  Subst (FromList tys) (Subst (Inc k) t) :~:
+  Subst (Inc (Minus k (Length tys))) t
+ax_SubstFresh = unsafeCoerce Refl
 
 
+
+
+$(singletons [d|
+    specPolyTy :: Nat -> Ty -> [Ty] -> Ty
+    specPolyTy k t1 tys =
+      if k <= length tys then
+        -- we have enough type arguments (ignore extras)
+        subst (fromList (take k tys)) t1
+      else
+        -- we don't have enough type arguments (regeneralize)
+        PolyTy (minus k (length tys)) (subst (fromList tys) t1)
+
+    upN :: Nat -> [Ty]
+    upN n = go Z where
+      go m = 
+        if n == m then []
+        else (VarTy m : go (S m))
+      
+  |])
+
+prop_length_upN n = length (upN n) == n
+
+ax_Length_UpN :: forall n.
+  Length (UpN n) :~: n
+ax_Length_UpN = unsafeCoerce Refl
+
+prop_subst_upN k ty =
+  subst (fromList (upN k)) (subst (lift k (Inc k)) ty) == ty
+
+ax_Subst_UpN :: forall k ty.
+  (Subst (FromList (UpN k)) (Subst (Lift k (Inc k)) ty)) :~: ty
+ax_Subst_UpN = unsafeCoerce Refl
+
+
+-- Deriving the specialization rule from the above
+spec :: forall g k ty tys. Sing g ->
+  Exp g (PolyTy k ty) -> Sing tys -> Exp g (SpecPolyTy k ty tys)
+spec g e1 tys =
+  case typeOf g e1 of
+    (SPolyTy k ty) ->
+       case k %<= sLength tys of
+         STrue
+           | Refl <- ax_Length_Take @k @tys
+           -> TyApp e1 (sTake k tys)         
+         SFalse
+           | Refl <- ax_SubstFreshList @g @k  @tys
+           , Refl <- ax_SubstFresh     @ty @k @tys
+           , Refl <- ax_Length_UpN  @k
+           , Refl <- ax_Subst_UpN      @k @ty
+           -> let
+                x :: Exp (SubstList (FromList tys) (IncList k g))
+                          (Subst (FromList tys) ty)
+                x = substTy (sFromList tys) w
+                
+                z :: Exp (IncList k g) (PolyTy k (Subst (Lift k (Inc k)) ty))
+                z = substTy (SInc k) e1
+
+                w :: Exp (IncList k g) (Subst (FromList (UpN k))
+                                              (Subst (Lift k (Inc k)) ty))
+                w = TyApp z (sUpN k)
+                
+                fact :: SubstList (FromList tys) (IncList k g) :~:
+                        IncList (Minus k (Length tys)) g
+                fact = Refl
+                
+              in
+                TyLam (sMinus k (sLength tys)) x 
 \end{code}
-Example of an operation defined over this representation --- evaluation.
+
+%endif
+
+\section{Type-safe evaluation and reduction}
+
+Once we have defined the substitution operations, the addition of polymorphism
+does not make the definition of a type-safe evaluator any more difficult.
+
+First, define a data type of values. Values must be closed, but may be of any
+type.  They include Base values, functions and polymorphic terms.  In the last
+two cases, the body of the values are suspended expressions.
+
+%if False
+\begin{code}
+type One a = '[a]
+type Nil   = '[]
+\end{code}
+%endif
+
+Because of the deep embedding of types, we also produce a deep embedding of
+values. In other words, we are producing a subset of System F expressions
+instead of Haskell values.
 
 \begin{code}
 data Val ty where
-  VBase  :: Val BaseTy
-  VLam   :: Sing t1 -> Exp '[t1] t2
-         -> Val (FnTy t1 t2)
-  VTyLam :: Sing k -> Exp '[] t2
-         -> Val (PolyTy k t2)
+  BaseV   :: Val BaseTy
+  LamV    :: Sing t1              -- type of binder
+          -> Exp (One t1) t2      -- body of abstraction
+          -> Val (FnTy t1 t2)
+  TyLamV  :: Sing k               -- num of tyvars to bind
+          -> Exp Nil t2           -- body of type abstraction
+          -> Val (PolyTy k t2)
+\end{code}
 
--- Closed expressions evaluate to values (or diverge)
-eval :: Exp '[] ty -> Val ty
-eval EBase = VBase
-eval (ELam t1 e1) = VLam t1 e1
-eval (EApp e1 e2) = case eval e1 of
-   VLam _ e1' -> eval (substE (EConsSub e2 EIdSub) e1')
-eval (TyLam k e1) = VTyLam k e1
-eval (TyApp e tys) = case eval e of
-   VTyLam k e' -> eval (substTy (sFromList tys) e')
-eval (EVar v) = case v of {}
+The evaluator translates terms that are already values to their corrsponding
+value-tagged forms.  For the two application cases, GHC can determine that the
+pattern matches are exhaustive (i.e. the only value of type |FnTy t1 t2| is
+|LamV|). In these two cases, the evaluator uses the substitution operations
+above to $\beta-reduce$ the applications.
+
+Furthermore, note that evaluation is not a structural recursive
+operation. This definition would not be accepted by Coq or Agda.
+
+\begin{code}
+oneSubE :: Exp g ty -> SubE (ty:g) g
+oneSubE e = ConsE e IdE
+\end{code}
+
+\begin{code}
+eval :: Exp Nil ty -> Val ty
+eval BaseE          = BaseV
+eval (LamE t1 e1)   = LamV t1 e1
+eval (AppE e1 e2)   =
+  case eval e1 of
+   LamV _ e1' ->
+     eval (substE (oneSubE e2) e1')
+eval (TyLam k e1)   = TyLamV k e1
+eval (TyApp e tys)  =
+  case eval e of
+    TyLamV k e' ->
+      eval (substTy (sFromList tys) e')
 \end{code}
 
 
-Another example -- parallel reduction. Needs an axiom!
+For parallel reduction, the code is also straightforward. However, in the
+case of type abstraction we need to show an equality.
 
 \begin{code}
-axiomPar :: forall g tys. Sing tys ->
-     SubstList (FromList tys) (IncList (NatLength tys) g) :~: g
-axiomPar _ = undefined
-
-prop_Par g tys = substList (fromList tys) (incList (natLength tys) g) == g
-
 par :: forall g ty. Exp g ty -> Exp g ty
-par EBase    = EBase
-par (EVar v) = EVar v
-par (EApp e1 e2) = case par e1 of
-  ELam _ty e1' -> substE (EConsSub e2 EIdSub) e1'
-  e1'         -> EApp e1' e2
-par (ELam ty e) = ELam ty (par e)
-par (TyApp (e :: Exp g (PolyTy k ty1)) (tys :: Sing tys)) = case par e of
-  TyLam k (e' :: Exp (IncList k g) ty1)
-    | Refl <- axiomPar @g tys
-    -> e1 where
-      e1 :: Exp (SubstList (FromList tys) (IncList k g)) (Subst (FromList tys) ty1)
-      e1 = substTy (sFromList tys) e'
-  e1' -> TyApp e1' tys
-par (TyLam k e) = TyLam k e
-\end{code}
-
-Example -- a System F type checker
-
-\begin{code}
-data UExp =
-    UVar Nat
-  | ULam Ty UExp
-  | UApp UExp UExp
-  | UTyLam Nat UExp
-  | UTyApp UExp [Ty]
-\end{code}
-
-Untyped version
-\begin{code}
-utc :: [Ty] -> UExp -> Maybe Ty
-utc g (UVar j)    = natIdx g j
-utc g (ULam t1 e) = do
-  t2 <- utc (t1:g) e
-  return (FnTy t1 t2)
-utc g (UApp e1 e2) = do
-  t1 <- utc g e1
-  t2 <- utc g e2
-  case t1 of
-    FnTy t12 t22
-      | t12 == t2 -> Just t22
-    _ -> Nothing
-utc g (UTyLam k e) = do
-  ty <- utc (incList k g) e
-  return (PolyTy k ty)
-utc g (UTyApp e tys) = do
-  ty <- utc g e
-  case ty of
-    PolyTy k ty1
-      | k == natLength tys
-      -> Just (subst (fromList tys) ty1)
-    _ -> Nothing
-\end{code}
-
-
-Type checker
-
-\begin{code}
-data TcResult f ctx where
-  Checks :: Sing t -> f ctx t -> TcResult f ctx
-  Errors :: String -> TcResult f ctx
-
---seq :: TcResult f ctx -> (Sing t -> f ctx t -> TcResult f ctx) -> TcResult f ctx
-
-tcVar :: Sing ctx -> Nat -> TcResult Var ctx
-tcVar (SCons t _ )   Z     = Checks t VZ
-tcVar (SCons _ ts)  (S m)  =
-  case tcVar ts m of
-   Checks t v -> Checks t (VS v)
-   Errors s   -> Errors s
-tcVar SNil          _     = Errors "unbound variable"
-   
-tcExp :: Sing ctx -> UExp -> TcResult Exp ctx
-tcExp g (UVar k) =
-  case tcVar g k of
-    Checks t v -> Checks t (EVar v)
-    Errors s   -> Errors s 
-tcExp g (ULam t1 u)
-  | SomeSing sT1 <- toSing t1
-  = case (tcExp (SCons sT1 g) u) of
-      Checks sT2 e -> Checks (SFnTy sT1 sT2) (ELam sT1 e)
-      Errors s     -> Errors s
-tcExp g (UApp u1 u2) =
-  case (tcExp g u1) of
-    Checks t1 e1 -> case (tcExp g u2) of
-      Checks t2 e2 ->
-        case t1 of
-          SFnTy t11 t12 ->
-            case testEquality t11 t2 of
-              Just Refl -> Checks t12 (EApp e1 e2)
-              Nothing -> Errors "Types don't match"
-          _ -> Errors "Not a function type"
-      Errors s -> Errors s
-    Errors s -> Errors s
-tcExp g (UTyLam k u1)
-  | SomeSing sK <- toSing k
-  = case (tcExp (sIncList sK g) u1) of
-      Checks t1 e1 -> Checks (SPolyTy sK t1) (TyLam sK e1)
-      Errors s     -> Errors s
-tcExp g (UTyApp u1 tys)
-  | SomeSing sTys <- toSing tys
-  = case (tcExp g u1) of
-      Checks t e1 ->
-        case t of
-          (SPolyTy sK t1) ->
-            case testEquality sK (sNatLength sTys) of
-              Just Refl -> Checks (sSubst (sFromList sTys) t1) (TyApp e1 sTys)
-              Nothing -> Errors "Wrong number of type args"
-          _ -> Errors "Wrong type in tyapp"
-      Errors s -> Errors s
-\end{code}
-
-Example: Typeof
-
-\begin{code}
-varTy :: Sing g -> Var g t -> Sing t
-varTy (SCons t _)  VZ      = t
-varTy (SCons _ g)  (VS n)  = varTy g n
-varTy SNil         v       = case v of {}
-
-typeOf :: Sing g -> Exp g t -> Sing t
-typeOf g (EVar v)       = varTy g v
-typeOf g EBase          = SBaseTy
-typeOf g (ELam t1 e)    = SFnTy t1 (typeOf (SCons t1 g) e)
-typeOf g (EApp e1 e2)   =
-  case typeOf g e1 of
-    SFnTy _ t2 -> t2
-typeOf g (TyLam k e)    = SPolyTy k (typeOf (sIncList k g) e)
-typeOf g (TyApp e tys)  =
-  case typeOf g e of
-    SPolyTy k t1 -> sSubst (sFromList tys) t1
-\end{code}
-
-Example: CPS conversion
-
-Note: need to know that these type functions are injective
-
-\begin{code}
-type VoidTy = PolyTy (S Z) (VarTy Z)
-
-type family CpsTy a = r | r -> a where
-  CpsTy (VarTy i)      = VarTy i
-  CpsTy BaseTy         = BaseTy
-  CpsTy (FnTy t1 t2)   = FnTy (CpsTy t1) (FnTy (ContTy t2) VoidTy)
-  CpsTy (PolyTy k t1)  = PolyTy k (FnTy (ContTy t1) VoidTy)
-
-type family ContTy a = r | r -> a where
-  ContTy t = FnTy (CpsTy t) VoidTy
-
-type family CpsList a = r | r -> a where
-   CpsList '[] = '[]
-   CpsList (t ': ts) = (CpsTy t ': CpsList ts)
-
-----------------------------------------------------------------
--- UGH: have to write these by hand
-
-voidTy = PolyTy 1 (VarTy 0)
-
-cpsTy :: Ty -> Ty
-cpsTy (VarTy i)      = VarTy i
-cpsTy BaseTy         = BaseTy
-cpsTy (FnTy t1 t2)   = FnTy (cpsTy t1) (FnTy (contTy t2) voidTy)
-cpsTy (PolyTy k t1)  = PolyTy k (FnTy (contTy t1) voidTy)
-
-contTy :: Ty -> Ty
-contTy t = FnTy (cpsTy t) voidTy
-
-cpsList :: [Ty] -> [Ty]
-cpsList [] = []
-cpsList (t:ts) = cpsTy t : cpsList ts
-
-sVoidTy :: Sing VoidTy
-sVoidTy = SPolyTy (SS SZ) (SVarTy SZ)
-
-sCpsTy :: Sing t -> Sing (CpsTy t)
-sCpsTy (SVarTy i)      = SVarTy i
-sCpsTy SBaseTy         = SBaseTy
-sCpsTy (SFnTy t1 t2)   = SFnTy (sCpsTy t1) (SFnTy (sContTy t2) sVoidTy)
-sCpsTy (SPolyTy k t1)  = SPolyTy k (SFnTy (sContTy t1) sVoidTy)
-
-sContTy :: Sing t -> Sing (ContTy t)
-sContTy t = SFnTy (sCpsTy t) sVoidTy
-
-sCpsList :: Sing ts -> Sing (CpsList ts)
-sCpsList SNil = SNil
-sCpsList (SCons t ts) = SCons (sCpsTy t) (sCpsList ts)
-
-----------------------------------------------------------------
--- NOTE: we still need CpsList because we have to convert the
--- type arguments
-{-
-type family CpsSub s = r | r -> s where
-  CpsSub IdSub          = IdSub
-  CpsSub (IncSub n)     = IncSub n
-  CpsSub (ConsSub t ts) = ConsSub (CpsTy t) (CpsSub ts)
-  CpsSub (TailSub n s)  = TailSub n (CpsSub s)
-  CpsSub (LiftSub n s)  = LiftSub n (CpsSub s)
-
-cpsSub :: Sub -> Sub
-cpsSub IdSub = IdSub
-cpsSub (IncSub n)     = IncSub n
-cpsSub (ConsSub t ts) = ConsSub (cpsTy t) (cpsSub ts)
-cpsSub (TailSub n s)  = TailSub n (cpsSub s)
-cpsSub (LiftSub n s)  = LiftSub n (cpsSub s)
-
-sCpsSub :: Sing s -> Sing (CpsSub s)
-sCpsSub SIdSub = SIdSub
-sCpsSub (SIncSub n)     = SIncSub n
-sCpsSub (SConsSub t ts) = SConsSub (sCpsTy t) (sCpsSub ts)
-sCpsSub (STailSub n s)  = STailSub n (sCpsSub s)
-sCpsSub (SLiftSub n s)  = SLiftSub n (sCpsSub s)
-
-cpsCommutes3 :: forall s ty.
-               CpsTy (Subst s ty) :~: Subst (CpsSub s) (CpsTy ty)
-cpsCommutes3 = unsafeCoerce Refl
-
-cps_commutes3 s ty =
-  cpsTy (subst s ty) == subst (cpsSub s) (cpsTy ty)
--}
-
-
-cpsCommutes :: forall n ty.
-               CpsTy (Subst (IncSub n) ty) :~: Subst (IncSub n) (CpsTy ty)
-cpsCommutes = unsafeCoerce Refl
-
-cps_commutes n ty =
-  cpsTy (subst (IncSub n) ty) == subst (IncSub n) (cpsTy ty)
-
-cpsCommutes2 :: forall tys ty.
-               CpsTy (Subst (FromList tys) ty) :~:
-               Subst (FromList (CpsList tys)) (CpsTy ty)
-cpsCommutes2 = unsafeCoerce Refl
-
-cps_commutes2 tys ty =
-  cpsTy (subst (fromList tys) ty) == subst (fromList (cpsList tys)) (cpsTy ty)
-
-cpsNatLength :: forall tys. NatLength tys :~: NatLength (CpsList tys)
-cpsNatLength = unsafeCoerce Refl
-
-cps_natLength tys =
-  natLength tys == natLength (cpsList tys)
-\end{code}
-
-\begin{code}
---cpsProg ::
-
-data CpsCtx g g' where
-  CpsStart  :: CpsCtx '[] '[]
-  CpsELam   :: Sing t1 -> Sing t2 -> CpsCtx g g'
-            -> CpsCtx (t1 ': g) (ContTy t2  ': CpsTy t1 ': g')
-  CpsEApp   :: Sing t1 -> CpsCtx g g'
-            -> CpsCtx (t1 ': g) (CpsTy t1  ': g')
-  CpsTyLam  :: Sing t1 -> CpsCtx g g'
-            -> CpsCtx        g  (ContTy t1 ': g')
-
-sIncCpsCtx :: forall n g g'.
-              Sing n -> CpsCtx g g' -> CpsCtx (IncList n g) (IncList n g')
-sIncCpsCtx n CpsStart = CpsStart
-sIncCpsCtx n (CpsELam (t1 :: Sing t1) (t2 :: Sing t2) gg)
-  | Refl <- cpsCommutes @n @t1
-  , Refl <- cpsCommutes @n @t2
-  = CpsELam (sInc n t1) (sInc n t2) (sIncCpsCtx n gg)
-sIncCpsCtx n (CpsEApp (t1 :: Sing t1) gg)
-  | Refl <- cpsCommutes @n @t1
-  = CpsEApp (sInc n t1) (sIncCpsCtx n gg)
-sIncCpsCtx n (CpsTyLam (t1 :: Sing t1) gg)
-  | Refl <- cpsCommutes @n @t1
-  = CpsTyLam (sInc n t1) (sIncCpsCtx n gg)
-  
-
-fstCtx :: CpsCtx g g' -> Sing g
-fstCtx CpsStart = SNil
-fstCtx (CpsELam t1 t2 gg) = SCons t1 (fstCtx gg)
-fstCtx (CpsEApp t1 gg)    = SCons t1 (fstCtx gg)
-fstCtx (CpsTyLam t1 gg)   = fstCtx gg
-
-
-cpsVar :: CpsCtx g g' -> Var g t -> Var g' (CpsTy t)
-cpsVar CpsStart v = case v of {}
-cpsVar (CpsELam t1 t2 gg) VZ     =  VS VZ
-cpsVar (CpsELam t1 t2 gg) (VS v) =  VS (VS (cpsVar gg v))
-cpsVar (CpsEApp t1 gg) VZ     =  VZ
-cpsVar (CpsEApp t1 gg) (VS v) =  VS (cpsVar gg v)
-cpsVar (CpsTyLam t1 gg)   v      =  VS (cpsVar gg v)
-
-
--- Follow Francois' "inefficient" version
--- Note the uses of substE and substCont in the EApp case
--- NOTE: if Meta was *actually* meta (i.e. a Haskell function), we would
--- not be able to reify it correctly
-data Cont g t where
-  Obj  :: Exp g (FnTy t VoidTy) -> Cont g t
-  Meta :: Exp (t ': g) VoidTy   -> Cont g t
-
-applyCont :: Cont g t -> Exp g t -> Exp g VoidTy
-applyCont (Obj o)  v  = EApp o v
-applyCont (Meta k) v  = (substE (EConsSub v EIdSub)) k
-
-reifyCont :: Sing t -> Cont g t -> Exp g (FnTy t VoidTy)
-reifyCont t (Obj o)   = o
-reifyCont t (Meta k)  = ELam t k
-
-substCont :: ESub g g' -> Cont g t -> Cont g' t
-substCont s (Obj o)   = Obj (substE s o)
-substCont s (Meta k)  = Meta (substE (ELiftSub s) k)
-
-substTyCont :: Sing s -> Cont g t -> Cont (SubstList s g) (Subst s t)
-substTyCont s (Obj o)   = Obj (substTy s o)
-substTyCont s (Meta k)  = Meta (substTy s k)
-
-cpsExp :: forall t g g'.
-          CpsCtx g g' 
-       -> Exp g t
-       -> Cont g' (CpsTy t) 
-       -> Exp g' VoidTy
-cpsExp gg (EVar v)      k = applyCont k (EVar (cpsVar gg v))
-cpsExp gg EBase         k = applyCont k EBase
-cpsExp gg (ELam t1 e1)  k =
-  case typeOf (fstCtx gg) (ELam t1 e1) of
-   (SFnTy (t1 :: Sing t1) (t2 :: Sing t2)) ->
-      let
-        e'  = ELam (sCpsTy t1)
-               $ ELam (sContTy t2)
-                 $ cpsExp (CpsELam t1 t2 gg) e1 k'
-
-        k'  = Obj $ EVar VZ
-
-      in
-        applyCont k e'    
-cpsExp gg (TyLam n e) k   = 
-  case typeOf (fstCtx gg) (TyLam n e) of
-    SPolyTy _k (t1 :: Sing t1) -> 
-      applyCont k $ TyLam n 
-                  $ ELam (sContTy t1) 
-                  $  cpsExp (CpsTyLam t1 (sIncCpsCtx n gg)) e (Obj $ EVar VZ)
+par BaseE          = BaseE
+par (VarE v)       = VarE v
+par (AppE e1 e2)   =
+  case par e1 of
+    LamE _ e1'  -> substE (oneSubE e2) e1'
+    e1'         -> AppE e1' e2
+par (LamE ty e)    = LamE ty (par e)
+par (TyApp e tys)  =
+  case par e of
+    TyLam k e' | Refl <- axiom_SubstInc @g tys
+         -> substTy (sFromList tys) e'
+    e1'  -> TyApp e1' tys
     
-cpsExp gg (EApp e1 e2)  k =
-  case typeOf (fstCtx gg) e1 of
-   (SFnTy (t1 :: Sing t1) (t2 :: Sing t2)) ->
-     let
-        k1 :: Cont g' (CpsTy (FnTy t1 t2))
-        k1 = Meta $ cpsExp (CpsEApp (SFnTy t1 t2) gg) (substE EIncSub e2) k2
-
-        k2 :: Cont (CpsTy (FnTy t1 t2) ': g') (CpsTy t1)
-        k2 = Meta $ EApp (EApp (EVar (VS VZ)) (EVar VZ))
-               (reifyCont (sCpsTy t2) (substCont EIncSub (substCont EIncSub k)))
-     in
-       cpsExp gg e1 k1
-cpsExp (gg :: CpsCtx g g') (TyApp e1 (tys :: Sing tys)) k =
-  case typeOf (fstCtx gg) e1 of
-    SPolyTy (n :: Sing n) (t1 :: Sing t1)
-      | Refl <- cpsCommutes2 @tys @t1
-      , Refl <- cpsNatLength @tys
-      ->
-      
-      let 
-          k1 :: Cont g' (CpsTy (PolyTy n t1))
-          k1 = Meta $ EApp (TyApp (EVar VZ) (sCpsList tys)) (reifyCont t1' k2)
-
-          k2 :: Cont (CpsTy (PolyTy n t1) ': g') 
-                     (Subst (FromList (CpsList tys)) (CpsTy t1))
-          k2 = substCont EIncSub k
-
-          t1' :: Sing (Subst (FromList (CpsList tys))  (CpsTy t1))
-          t1' = sSubst (sFromList (sCpsList tys)) (sCpsTy t1)
-      in
-        cpsExp gg e1 k1
+par (TyLam k e)    = TyLam k e
 \end{code}
 
-
-\section {testing code}
+In this case, the substitution in the context should have no effect as it is
+preceeded by incrementing all type variables out of the way.
 
 \begin{code}
-fi :: Integer -> Nat
-fi n = if n == 0 then Z
-    else if n < 0 then fi (-n)
-    else S (fi (n - 1))
+axiom_SubstInc :: forall g tys.
+  Sing tys -> SubstList (FromList tys) (IncList (Length tys) g) :~: g
+axiom_SubstInc = unsafeCoerce Refl
 
-upto :: Nat -> [Nat]
-upto Z = []
-upto (S m) = m : upto m
-  
-instance Arbitrary Nat where
-  arbitrary = fi <$> arbitrary
-  shrink Z = []
-  shrink (S n) = [n]
+prop_SubstInc :: [Ty] -> [Ty] -> Bool
+prop_SubstInc g tys = 
+  substList (fromList tys) (incList (length tys) g) == g
 
-instance Arbitrary RSub where
-  arbitrary = Reg <$> arbitrary <*> arbitrary
-  shrink (Reg t x) = [Reg t' x' | t' <- shrink t, x' <- shrink x]
-
-instance Arbitrary Ty where
-  arbitrary = sized (gt Z) where
-    base n = oneof (return BaseTy : [return (VarTy k) | k <- upto (fi 5) ])
-    gl :: Nat -> Int -> Gen [Ty]
-    gl n m = (gt n m) >>= \ty -> return [ty]
-    
-    gt :: Nat -> Int -> Gen Ty
-    gt n m =
-      if m <= 1 then base n
-      else
-      let m' = m `div` 2 in
-      frequency
-      [(2, base n),
-       (1, FnTy <$> gt n m' <*> gt n m'),
-       (1, do
-           k <- elements [Z, S Z, S (S Z), S (S (S Z))]
-           a <- gl (n + k) m'
-           r <- gt (n + k) m'
-           return (PolyTy k r))]
-      
-  shrink BaseTy = []   
-  shrink (VarTy n) = [VarTy n' | n' <- shrink n]
-  shrink (FnTy t1 t2) = t1 : t2 : 
-    [ FnTy t1' t2' | t1' <- shrink t1, t2' <- shrink t2]
-  shrink (PolyTy n t) = t : 
-    [ PolyTy n' t' | n' <- shrink n, t' <- shrink t]
-
-instance Arbitrary Sub where
-  arbitrary = sized gt where
-    base = oneof [return IdSub, IncSub <$> arbitrary]
-    gt m =
-      if m <= 1 then base else
-      let m' = m `div` 2 in
-      frequency
-      [(1, base),
-       (1, (:·) <$> arbitrary <*> gt m'), -- always closed? FVs?
-       (1, (:∘) <$> gt m' <*> gt m')]
-
-  shrink IdSub = []
-  shrink (IncSub n) = [IncSub n' | n' <- shrink n]
-  shrink (t :· s)   = s : [t' :· s' | t' <- shrink t, s' <- shrink s]
-  shrink (s1 :∘ s2) = s1 : s2 :
-    [s1' :∘ s2 | s1' <- shrink s1, s2' <- shrink s2]                       
-  shrink (LiftSub n s) = s : [LiftSub n s' | n <- shrink n, s' <- shrink s]
-
-----------------------------------------------------------------------
-----------------------------------------------------------------------
-
-
-
-prop_cons_sub ty ss tt =
-  subst (ty :· ss) (subst (IncSub 1) tt) == subst ss tt
-
-
-return []
-runTests = $forAllProperties qc
 \end{code}
 
+%include cps.lhs
 
-\begin{code}
-qc :: Testable prop => prop -> IO Result
-qc = quickCheckWithResult (stdArgs { maxSuccess = 1000 })
-\end{code}
 
 \section{Related Work}
 
@@ -1547,8 +1433,84 @@ CPP 2015
 
 %% Appendix
 \appendix
-\section{Appendix}
+\section{Appendix: arbitrary instance}
 
-Text of appendix \ldots
+\begin{code}
+
+fi :: Integer -> Nat
+fi n = if n == 0 then Z
+    else if n < 0 then fi (-n)
+    else S (fi (n - 1))
+
+upto :: Nat -> [Nat]
+upto Z = []
+upto (S m) = m : upto m
+  
+instance Arbitrary Nat where
+  arbitrary = fi <$> arbitrary
+  shrink Z = []
+  shrink (S n) = [n]
+
+instance Arbitrary Ty where
+  arbitrary = sized (gt Z) where
+    base n = oneof
+       (return BaseTy : [return (VarTy k)
+                        | k <- upto (fi 5) ])
+    gl :: Nat -> Int -> Gen [Ty]
+    gl n m = (gt n m) >>= \ty -> return [ty]
+    
+    gt :: Nat -> Int -> Gen Ty
+    gt n m =
+      if m <= 1 then base n
+      else
+      let m' = m `div` 2 in
+      frequency
+      [(2, base n),
+       (1, FnTy <$> gt n m' <*> gt n m'),
+       (1, do
+           k <- elements [Z, S Z, S (S Z), S (S (S Z))]
+           a <- gl (n + k) m'
+           r <- gt (n + k) m'
+           return (PolyTy k r))]
+      
+  shrink BaseTy = []   
+  shrink (VarTy n) = [VarTy n' | n' <- shrink n]
+  shrink (FnTy t1 t2) = t1 : t2 : 
+    [ FnTy t1' t2' | t1' <- shrink t1, t2' <- shrink t2]
+  shrink (PolyTy n t) = t : 
+    [ PolyTy n' t' | n' <- shrink n, t' <- shrink t]
+
+instance Arbitrary Sub where
+  arbitrary = sized gt where
+    base = oneof [Inc <$> arbitrary]
+    gt m =
+      if m <= 1 then base else
+      let m' = m `div` 2 in
+      frequency
+      [(1, base),
+       (1, (:·)    <$> arbitrary <*> gt m'), 
+       (1, (:∘)    <$> gt m'     <*> gt m')]
+
+  shrink (Inc n) = [Inc n' | n' <- shrink n]
+  shrink (t :· s)   = s : [t' :· s' | t' <- shrink t, s' <- shrink s]
+  shrink (s1 :∘ s2) = s1 : s2 :
+    [s1' :∘ s2 | s1' <- shrink s1, s2' <- shrink s2]                       
+
+
+prop_cons_sub ty ss tt =
+  subst (ty :· ss) (subst (Inc 1) tt) == subst ss tt
+
+
+return []
+runTests = $forAllProperties qc
+
+\end{code}
+
+
+\begin{code}
+qc :: Testable prop => prop -> IO Result
+qc = quickCheckWithResult (stdArgs { maxSuccess = 1000 })
+\end{code}
+
 
 \end{document}

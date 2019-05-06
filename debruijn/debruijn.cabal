@@ -17,9 +17,11 @@ cabal-version:       >=1.10
 
 library
   exposed-modules:     Sysf
-  -- other-modules:
+  other-modules:       Nat,
+                       TypeCheck,
+                       Cps
   -- other-extensions:
-  build-depends:       base >=4.11 && <4.12,
+  build-depends:       base >=4.11 && <4.13,
                        singletons >= 2.4,
                        QuickCheck >= 2.12
   -- hs-source-dirs:

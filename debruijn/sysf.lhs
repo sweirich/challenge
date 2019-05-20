@@ -749,7 +749,7 @@ so the type of the body lines up. But we need a type equality between the
 contexts.
 
 
-The other three lemmas are also provable.
+We also need three more lemmas.
 
 \begin{spec}
 lemma_LiftIncList :: forall s k g.
@@ -983,84 +983,6 @@ prop_LengthSubstList :: Sub -> [Ty] -> Bool
 prop_LengthSubstList s tys =
   length (substList s tys) == length tys
 \end{code}
-
-
-%if False
-
-Note that this function is more proof than code --- if you look at it, it is
-just an identity function.  It is justified to replace the above with the
-definition below, which has equivalent behavior.
-
-\begin{spec}
-substVar :: (Var g ty) -> Var (SubstList s g) (Subst s ty)
-substVar v = unsafeCoerce v
-\end{spec}
-
-This is any example where, if we are not willing to use unsafeCoerce, we need
-to pay a performance cost for the use of an intrinsic representation. The
-intrinsic representation uses terms \emph{as proofs}.
-
-This is not an issue with the fact that we are working in Haskell. Even in Coq
-or Agda, we would face this dilemma. Indeed, there doesn't seem to be a way
-out of this quandry without stepping out of the proof system.
-
-Only Cedille's zero-cost conversions would be able to attack this issue. 
-In that vein, perhaps Haskell could similarly support a way to derive the
-fact that even though two terms have different types, they have the same runtime
-representation. 
-
-\begin{spec}
-instance Coercible (Var g ty) (Var (SubstList s g) (Subst s ty)) where
-  ...
-substVar :: Sing s -> (Var g ty) -> Var (SubstList s g) (Subst s ty)
-substVar s v = coerce v
-\end{spec}
-
-
-\begin{code}
-ax_subst_comp :: forall s1 s2 t.
-  Subst (s1 :∘ s2) t :~: Subst s2 (Subst s1 t)
-ax_subst_comp = unsafeCoerce Refl
-
-ax_subst_id :: forall t. Subst IdSub t :~: t
-ax_subst_id = unsafeCoerce Refl
-\end{code}
-
-
-
-Why is this equality justfied? Consider what happens in the case of some type variable
-k1, that occurs in one type in the list. In this case, we need to show that 
-
-  Subst (Lift k s) (Subst (Inc k) (VarTy k1))
-  :~: Subst (Inc k) (Subst s (VarTy k1))
-
-So we have the following sequence of equalities connecting the left-hand-side with the
-right-hand side.
-
-\begin{spec}
-   LHS  == Subst (Lift k s) (VarTy (Plus k k1))
-         {{ unfolding definitions }}
-        == if (Plus k k1) < k 
-             then VarTy (Plus k k1)
-             else inc k s !! (sub (Plus k k1) k)
-         {{ first case is impossible }}
-        == inc k s !! (sub (Plus k k1) k)
-         {{ arithmetic }}
-        == inc k (s !! k1)
-         {{ unfolding definitions }}
-        == RHS
-\end{spec}
-
-We don't want to prove this equation in Haskell. That would impose a runtime
-cost to our substitution function. Instead, we would like to declare this
-property as an "axiom", one that we believe holds about the system.
-
-We can gain confidence in the axiom in two ways. On one hand, we could try to
-prove it on paper, or in an external tool, or in LiquidHaskell. However, it is
-simpler to test it via quickCheck.  So, let's state it as a quickcheck
-property.
-
-%endif
 
 
 \section{Term substitution}
@@ -1400,7 +1322,7 @@ Uses "standard" de Brujn Indices to represent System F types
 All/Var in Type.
 
 Revisiting the CPS Transformation and its Implementation
-Franc¸ois Pottier
+Francois Pottier
 
 Martín Abadi, Luca Cardelli, Pierre-Louis Curien, and Jean-Jacques Lévy. Explicit
 substitutions. J. Funct. Program., 1(4):375–416, 1991.

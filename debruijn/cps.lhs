@@ -64,9 +64,16 @@ return; they invoke their continuations instead.  So the result type of the
 function is \emph{void}, i.e. $\forall a.a$, expressed in System F as:
 
 \begin{code}
-type VoidTy = PolyTy (S Z) (VarTy Z)
+$(singletons
+  [d|
+    voidTy = PolyTy (S Z) (VarTy Z)
+    |])
 \end{code}
 
+The type transformation is an injective function. Haskell can observe such
+things if we tell it to do so. Therefore, we define this transformation, not
+using the singletons library, but as a closed type family with an injectivity
+constraint. (The result `r` determines the input `a`).
 
 \begin{code}
 type family CpsTy a = r | r -> a where
@@ -85,10 +92,12 @@ type family CpsList g = r | r -> g where
    CpsList (t : g) = (CpsTy t : CpsList g)
 \end{code}
 
+The singletons library does not support injectivity constraints, so we are
+forced in this case to explicitly write these functions three times. (This
+code is omitted.)
+
 %if False
 \begin{code}
-voidTy = PolyTy 1 (VarTy 0)
-
 cpsTy :: Ty -> Ty
 cpsTy (VarTy i)      = VarTy i
 cpsTy BaseTy         = BaseTy
@@ -101,9 +110,6 @@ contTy t = FnTy (cpsTy t) voidTy
 cpsList :: [Ty] -> [Ty]
 cpsList [] = []
 cpsList (t:ts) = cpsTy t : cpsList ts
-
-sVoidTy :: Sing VoidTy
-sVoidTy = SPolyTy (SS SZ) (SVarTy SZ)
 
 sCpsTy :: Sing t -> Sing (CpsTy t)
 sCpsTy (SVarTy i)      = SVarTy i
@@ -119,6 +125,181 @@ sCpsList SNil = SNil
 sCpsList (SCons t ts) = SCons (sCpsTy t) (sCpsList ts)
 \end{code}
 %endif
+
+
+The CPS transform is tricky with this representation for two reasons.
+
+First, an efficient one pass transformation requires the use of both object
+and \emph{meta} level continuations. (Without meta continuations, the
+transform introduces additional $\beta$-redexes.) Usually, these
+meta-continuations are represented by functions in the host language. This
+works well for HOAS-based variable representations, but doesn't work with
+debruijn indices.
+
+For that reason, we follow Pottier~\cite{pottier}, and define meta
+continuations as expressions with dedicated holes.
+
+\begin{code}
+data Cont g t where
+  Obj   :: Exp g (FnTy t VoidTy)  -> Cont g t
+  Meta  :: Exp (t : g) VoidTy     -> Cont g t
+
+applyCont :: Cont g t -> Exp g t -> Exp g VoidTy
+applyCont (Obj o)  v  = AppE o v
+applyCont (Meta k) v  = (substE (ConsE v IdE)) k
+
+reifyCont :: Sing t -> Cont g t -> Exp g (FnTy t VoidTy)
+reifyCont t (Obj o)   = o
+reifyCont t (Meta k)  = LamE t k
+\end{code}
+
+Because this representation of continuations is first-order, we can easily
+define substitution operations for both type and expression variables.
+
+\begin{code}
+substTyCont :: Sing s -> Cont g t -> Cont (SubstList s g) (Subst s t)
+substTyCont s (Obj o)   = Obj (substTy s o)
+substTyCont s (Meta k)  = Meta (substTy s k)
+
+substCont :: SubE g g' -> Cont g t -> Cont g' t
+substCont s (Obj o)   = Obj (substE s o)
+substCont s (Meta k)  = Meta (substE (liftE1 s) k)
+\end{code}
+
+
+The other difficulty with this transformation is that, by introducing new
+continuation arguments in the transformation of functions and polymorphic
+expressions, it modifies the context. As a result, when we transform
+expression variables, we need to shift their indices.
+
+Most versions of this transformation mark these newly introduced assumptions
+with a special purpose ``continuation type'' so that it is easy to define the
+relationship between in the input and output contexts.
+
+However, here we do not specialize our language to the
+transformation. Instead, we include the following information
+ 
+\begin{code}
+data CpsCtx g g' where
+  
+  CpsStart  :: CpsCtx Nil Nil
+  -- Empty context
+
+  CpsLamE   :: Sing t1 -> proxy t2 -> CpsCtx g g'
+            -> CpsCtx (t1 : g) (ContTy t2 : CpsTy t1 : g')
+  -- Context in the body of LamE. The input has the type
+  -- of the parameter and the output has both its converted
+  -- type and a continuation. 
+
+  CpsTyLam  :: Sing t1 -> CpsCtx g g'
+            -> CpsCtx g (ContTy t1 : g')
+  -- Context in the body of a TyLam. The output includes
+  -- a continuation for the polymorphic term.
+
+  CpsMetaE   :: Sing t1 -> CpsCtx g g'
+            -> CpsCtx (t1 : g) (CpsTy t1  : g')
+  -- Context in the body of Meta. The input has the type
+  -- of the parameter and the output has the converted type.
+            
+\end{code}
+
+We use this data structure when transforming expression variables. We need to
+convert the input variable of the correct type in the input context to be
+appropriate for the output context, with the converted type.
+
+\begin{code}
+cpsVar :: CpsCtx g g' -> Var g t -> Var g' (CpsTy t)
+cpsVar CpsStart v = case v of {}
+cpsVar (CpsLamE t1 t2 gg) (V SZ)      =  V (SS SZ)
+cpsVar (CpsLamE t1 t2 gg) (V (SS v))  =
+  case cpsVar gg (V v) of
+    V v' -> V (SS (SS v'))
+cpsVar (CpsTyLam t1 gg)   v           =
+  case cpsVar gg v of
+    V v' -> V (SS v')
+cpsVar (CpsMetaE t1 gg)    (V SZ)      =  V SZ
+cpsVar (CpsMetaE t1 gg)    (V (SS v))  =
+  case cpsVar gg (V v) of
+    V v' -> V (SS v')
+\end{code}
+
+Furthermore, the CPS transformation needs information about the types of
+sub-expressions during the transformation so that it can annotate the output
+with the appropriate types for the introduced continuations. We can use
+`typeOf` above to find these types as long as we know the context.  (NOTE:
+this is inefficient. Can we pass this type information into the program? But
+then how to reconstruct it in an application? Maybe CPS should be
+bidirectional...)
+
+\begin{code}
+cpsExp :: forall t g g'.
+          CpsCtx g g' 
+       -> Exp g t
+       -> Cont g' (CpsTy t) 
+       -> Exp g' VoidTy
+cpsExp g (VarE v)      k =
+  case cpsVar g (V v) of
+         V v' -> applyCont k (VarE v')
+cpsExp g BaseE         k =
+  applyCont k BaseE
+cpsExp g (LamE t1 e1)  k =
+  case typeOf (fstCtx g) (LamE t1 e1) of
+   (SFnTy _t1 t2) ->
+      let
+        e'  = LamE (sCpsTy t1)
+               $ LamE (sContTy t2)
+                 $ cpsExp (CpsLamE t1 t2 g) e1 k'
+
+        k'  = Obj $ VarE SZ
+
+      in
+        applyCont k e'    
+cpsExp g (TyLam n e) k   = 
+  case typeOf (fstCtx g) (TyLam n e) of
+    SPolyTy _n t1 -> 
+      applyCont k
+      $ TyLam n 
+      $ LamE (sContTy t1) 
+      $ cpsExp (CpsTyLam t1
+                (sIncCpsCtx n g)) e (Obj $ VarE SZ)
+ 
+cpsExp g (AppE e1 e2)  k =
+  case typeOf (fstCtx g) e1 of
+   (SFnTy (t1 :: Sing t1) (t2 :: Sing t2)) ->
+     let
+        
+        k1 :: Cont g' (CpsTy (FnTy t1 t2))
+        k1 = Meta $ cpsExp (CpsMetaE (SFnTy t1 t2) g)
+                       (substE IncE e2) k2
+
+        k2 :: Cont (CpsTy (FnTy t1 t2) ': g') (CpsTy t1)
+        k2 =  Meta $ AppE (AppE (VarE (SS SZ)) (VarE SZ))
+               (reifyCont (sCpsTy t2)
+                (substCont IncE (substCont IncE k)))
+
+     in
+       cpsExp g e1 k1
+ 
+cpsExp (g :: CpsCtx g g') (TyApp e1 (tys :: Sing tys)) k =
+  case typeOf (fstCtx g) e1 of
+    SPolyTy (n :: Sing n) (t1 :: Sing t1)
+      | Refl <- cpsCommutes2 @tys @t1
+      , Refl <- cpsLength @tys
+      ->
+      let 
+          k1 :: Cont g' (CpsTy (PolyTy n t1))
+          k1 = Meta $ AppE (TyApp (VarE SZ)
+                             (sCpsList tys)) (reifyCont t1' k2)
+
+          k2 :: Cont (CpsTy (PolyTy n t1) ': g') 
+                     (Subst (FromList (CpsList tys)) (CpsTy t1))
+          k2 = substCont IncE k
+
+          t1' :: Sing (Subst (FromList (CpsList tys))  (CpsTy t1))
+          t1' = sSubst (sFromList (sCpsList tys)) (sCpsTy t1)
+      in
+        cpsExp g e1 k1
+\end{code}
 
 \begin{code}
 cpsCommutes :: forall n ty.
@@ -145,147 +326,29 @@ cps_length tys =
   
 \end{code}
 
-Follow Francois' "inefficient" version
-Note the uses of substE and substCont in the AppE case
-NOTE: if Meta was *actually* meta (i.e. a Haskell function), we would
-not be able to reify it correctly
 
 
 \begin{code}
-
-data CpsCtx g g' where
-  CpsStart  :: CpsCtx Nil Nil
-  CpsLamE   :: Sing t1 -> Sing t2 -> CpsCtx g g'
-            -> CpsCtx (t1 : g) (ContTy t2 : CpsTy t1 : g')
-  CpsAppE   :: Sing t1 -> CpsCtx g g'
-            -> CpsCtx (t1 : g) (CpsTy t1  : g')
-  CpsTyLam  :: Sing t1 -> CpsCtx g g'
-            -> CpsCtx        g  (ContTy t1 : g')
-
 sIncCpsCtx  :: forall n g g'.
               Sing n
             -> CpsCtx g g'
             -> CpsCtx (IncList n g) (IncList n g')
 sIncCpsCtx n CpsStart = CpsStart
-sIncCpsCtx n (CpsLamE (t1 :: Sing t1) (t2 :: Sing t2) gg)
+sIncCpsCtx n (CpsLamE (t1 :: Sing t1) (t2 :: p t2) g)
   | Refl <- cpsCommutes @n @t1
   , Refl <- cpsCommutes @n @t2
   = CpsLamE (sSubst (SInc n) t1)
-     (sSubst (SInc n) t2) (sIncCpsCtx n gg)
-sIncCpsCtx n (CpsAppE (t1 :: Sing t1) gg)
+     (Proxy :: Proxy (Subst (Inc n) t2)) (sIncCpsCtx n g)
+sIncCpsCtx n (CpsMetaE (t1 :: Sing t1) g)
   | Refl <- cpsCommutes @n @t1
-  = CpsAppE (sSubst (SInc n) t1) (sIncCpsCtx n gg)
-sIncCpsCtx n (CpsTyLam (t1 :: Sing t1) gg)
+  = CpsMetaE (sSubst (SInc n) t1) (sIncCpsCtx n g)
+sIncCpsCtx n (CpsTyLam (t1 :: Sing t1) g)
   | Refl <- cpsCommutes @n @t1
-  = CpsTyLam (sSubst (SInc n) t1) (sIncCpsCtx n gg)
+  = CpsTyLam (sSubst (SInc n) t1) (sIncCpsCtx n g)
   
-
 fstCtx :: CpsCtx g g' -> Sing g
 fstCtx CpsStart = SNil
-fstCtx (CpsLamE t1 t2 gg) = SCons t1 (fstCtx gg)
-fstCtx (CpsAppE t1 gg)    = SCons t1 (fstCtx gg)
-fstCtx (CpsTyLam t1 gg)   = fstCtx gg
-
-data Cont g t where
-  Obj   :: Exp g (FnTy t VoidTy)  -> Cont g t
-  Meta  :: Exp (t : g) VoidTy     -> Cont g t
-
-applyCont :: Cont g t -> Exp g t -> Exp g VoidTy
-applyCont (Obj o)  v  = AppE o v
-applyCont (Meta k) v  = (substE (ConsE v IdE)) k
-
-reifyCont :: Sing t -> Cont g t -> Exp g (FnTy t VoidTy)
-reifyCont t (Obj o)   = o
-reifyCont t (Meta k)  = LamE t k
-
-substCont :: SubE g g' -> Cont g t -> Cont g' t
-substCont s (Obj o)   = Obj (substE s o)
-substCont s (Meta k)  = Meta (substE (liftE1 s) k)
-
-substTyCont :: Sing s -> Cont g t -> Cont (SubstList s g) (Subst s t)
-substTyCont s (Obj o)   = Obj (substTy s o)
-substTyCont s (Meta k)  = Meta (substTy s k)
-
-cpsVar :: CpsCtx g g' -> Var g t -> Var g' (CpsTy t)
-cpsVar CpsStart v = case v of {}
-cpsVar (CpsLamE t1 t2 gg) (V SZ)      =  V (SS SZ)
-cpsVar (CpsLamE t1 t2 gg) (V (SS v))  =
-  case cpsVar gg (V v) of
-    V v' -> V (SS (SS v'))
-cpsVar (CpsAppE t1 gg)    (V SZ)      =  V SZ
-cpsVar (CpsAppE t1 gg)    (V (SS v))  =
-  case cpsVar gg (V v) of
-    V v' -> V (SS v')
-cpsVar (CpsTyLam t1 gg)   v           =
-  case cpsVar gg v of
-    V v' -> V (SS v')
-
-
-cpsExp :: forall t g g'.
-          CpsCtx g g' 
-       -> Exp g t
-       -> Cont g' (CpsTy t) 
-       -> Exp g' VoidTy
-cpsExp gg (VarE v)      k = case cpsVar gg (V v) of
-  V v' -> applyCont k (VarE v')
-cpsExp gg BaseE         k = applyCont k BaseE
-cpsExp gg (LamE t1 e1)  k =
-  case typeOf (fstCtx gg) (LamE t1 e1) of
-   (SFnTy (t1 :: Sing t1) (t2 :: Sing t2)) ->
-      let
-        e'  = LamE (sCpsTy t1)
-               $ LamE (sContTy t2)
-                 $ cpsExp (CpsLamE t1 t2 gg) e1 k'
-
-        k'  = Obj $ VarE SZ
-
-      in
-        applyCont k e'    
-cpsExp gg (TyLam n e) k   = 
-  case typeOf (fstCtx gg) (TyLam n e) of
-    SPolyTy _k (t1 :: Sing t1) -> 
-      applyCont k
-      $ TyLam n 
-      $ LamE (sContTy t1) 
-      $ cpsExp (CpsTyLam t1
-                (sIncCpsCtx n gg)) e (Obj $ VarE SZ)
- 
-cpsExp gg (AppE e1 e2)  k =
-  case typeOf (fstCtx gg) e1 of
-   (SFnTy (t1 :: Sing t1) (t2 :: Sing t2)) ->
-     let
-        
-        k1 :: Cont g' (CpsTy (FnTy t1 t2))
-        k1 = Meta $ cpsExp (CpsAppE (SFnTy t1 t2) gg)
-                       (substE IncE e2) k2
-
-        k2 :: Cont (CpsTy (FnTy t1 t2) ': g') (CpsTy t1)
-        k2 =  Meta $ AppE (AppE (VarE (SS SZ)) (VarE SZ))
-               (reifyCont (sCpsTy t2)
-                (substCont IncE (substCont IncE k)))
-
-     in
-       cpsExp gg e1 k1
- 
-cpsExp (gg :: CpsCtx g g') (TyApp e1 (tys :: Sing tys)) k =
-  case typeOf (fstCtx gg) e1 of
-    SPolyTy (n :: Sing n) (t1 :: Sing t1)
-      | Refl <- cpsCommutes2 @tys @t1
-      , Refl <- cpsLength @tys
-      ->
-      
-      let 
-          k1 :: Cont g' (CpsTy (PolyTy n t1))
-          k1 = Meta $ AppE (TyApp (VarE SZ)
-                             (sCpsList tys)) (reifyCont t1' k2)
-
-          k2 :: Cont (CpsTy (PolyTy n t1) ': g') 
-                     (Subst (FromList (CpsList tys)) (CpsTy t1))
-          k2 = substCont IncE k
-
-          t1' :: Sing (Subst (FromList (CpsList tys))  (CpsTy t1))
-          t1' = sSubst (sFromList (sCpsList tys)) (sCpsTy t1)
-      in
-        cpsExp gg e1 k1
-
+fstCtx (CpsLamE t1 t2 g) = SCons t1 (fstCtx g)
+fstCtx (CpsMetaE t1 g)    = SCons t1 (fstCtx g)
+fstCtx (CpsTyLam t1 g)   = fstCtx g
 \end{code}

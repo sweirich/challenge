@@ -432,7 +432,7 @@ other free variables are left alone.
 $(singletons [d|
     fromList :: [Ty] -> Sub
     fromList (t:ts)  = t :· fromList ts
-    fromList []      = Inc Z
+    fromList []      = idSub
   |])
 \end{code}
 
@@ -445,7 +445,7 @@ variables in the range of |s| are all incremented by |n|.
 \begin{code}
 $(singletons [d|
     lift :: Nat -> Sub -> Sub
-    lift n s = upTo n (s :∘ Inc n)
+    lift k s = upTo k (s :∘ Inc k)
 
     upTo :: Nat -> Sub -> Sub
     upTo Z      s = s
@@ -1510,6 +1510,7 @@ runTests = $forAllProperties qc
 \begin{code}
 qc :: Testable prop => prop -> IO Result
 qc = quickCheckWithResult (stdArgs { maxSuccess = 1000 })
+
 \end{code}
 
 

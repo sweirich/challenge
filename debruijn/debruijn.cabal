@@ -16,13 +16,45 @@ extra-source-files:  CHANGELOG.md, README.md
 cabal-version:       >=1.10
 
 library
-  exposed-modules:     Sysf
-  other-modules:       Nat,
+  exposed-modules:     Nat
+  other-modules:       Imports,
+                       Sysf,
                        TypeCheck,
-                       Cps
+                       Cps,
+                       Polylam,
+                       Subst,
+                       Simple
   -- other-extensions:
-  build-depends:       base >=4.11 && <4.13,
-                       singletons >= 2.4,
-                       QuickCheck >= 2.12
+  build-depends:       base >=4.13,
+                       singletons >= 2.6,
+                       QuickCheck >= 2.12,
+                       ghc-typelits-knownnat >= 0.7.2,
+                       wl-pprint >= 1.2
   -- hs-source-dirs:
   default-language:    Haskell2010
+  
+  default-extensions:  AllowAmbiguousTypes,
+                       DataKinds,
+                       DefaultSignatures,
+                       EmptyCase,
+                       ExistentialQuantification,
+                       FlexibleContexts,
+                       FlexibleInstances,
+                       GADTs,
+                       IncoherentInstances,
+                       InstanceSigs,
+                       KindSignatures,
+                       MultiParamTypeClasses,
+                       NoStarIsType,
+                       PartialTypeSignatures,
+                       PolyKinds,
+                       RankNTypes,
+                       ScopedTypeVariables,
+                       StandaloneDeriving,
+                       TypeApplications,
+                       TypeFamilyDependencies,
+                       TypeFamilies,
+                       TypeOperators,
+                       UndecidableInstances
+
+--  ghc-options:         -fplugin GHC.TypeLits.KnownNat.Solver

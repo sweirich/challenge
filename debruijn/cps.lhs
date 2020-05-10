@@ -2,54 +2,17 @@
 
 %if False
 \begin{code}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DefaultSignatures #-}
-{-# LANGUAGE EmptyCase #-}
-{-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE IncoherentInstances #-}
-{-# LANGUAGE InstanceSigs #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE PartialTypeSignatures #-}
-{-# LANGUAGE PolyKinds #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeFamilyDependencies #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE UndecidableInstances #-}
-
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Cps where
 
 import Prelude hiding ((!!),(>>),drop,take,length)
 import Test.QuickCheck hiding ((===))
-import Data.Singletons
-import Data.Singletons.Prelude
-   hiding (Drop,Take,Length,
-          sDrop,sTake,sLength,
-          DropSym0,DropSym1,DropSym2,
-          TakeSym0,TakeSym1,TakeSym2)
-
-import Data.Singletons.TH
-   hiding (Drop,Take,Length,
-          sDrop,sTake,sLength,
-          DropSym0,DropSym1,DropSym2,
-          TakeSym0,TakeSym1,TakeSym2)
-
-import Data.Kind(Type)
-import Data.Type.Equality
-
 import Unsafe.Coerce
-
 import Debug.Trace
+
+import Imports
 import Nat
 import SysF
 \end{code}

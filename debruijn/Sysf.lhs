@@ -1,5 +1,3 @@
-
-
 \documentclass[sigplan,10pt,review,anonymous]{acmart}
 \settopmatter{printfolios=true,printccs=false,printacmref=false}
 
@@ -108,59 +106,25 @@ Text of abstract \ldots.
 
 %if False
 \begin{code}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DefaultSignatures #-}
-{-# LANGUAGE EmptyCase #-}
-{-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE IncoherentInstances #-}
-{-# LANGUAGE InstanceSigs #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE PartialTypeSignatures #-}
-{-# LANGUAGE PolyKinds #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeFamilyDependencies #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE UndecidableInstances #-}
-
 {-# LANGUAGE AllowAmbiguousTypes #-}
 
 {-# OPTIONS_GHC -fwarn-incomplete-patterns -Wno-redundant-constraints #-}
 module SysF where
 
+import Imports
+import Nat
+
 import Prelude hiding ((!!),(>>),drop,take,length)
 import Test.QuickCheck hiding ((===))
-import Data.Singletons
-import Data.Singletons.Prelude
-   hiding (Drop,Take,Length,
-          sDrop,sTake,sLength,
-          DropSym0,DropSym1,DropSym2,
-          TakeSym0,TakeSym1,TakeSym2)
-
-import Data.Singletons.TH
-   hiding (Drop,Take,Length,
-          sDrop,sTake,sLength,
-          DropSym0,DropSym1,DropSym2,
-          TakeSym0,TakeSym1,TakeSym2)
-
-import Data.Kind(Type)
-
-import Data.Type.Equality
 
 import Debug.Trace
-import Nat
+
 \end{code}
 %endif
 
-Let's get this out of the way right now.
+Let's get this out of the way right now. There is a gun on the piano, and it
+will be fired in the second act.
 \begin{code}
 import Unsafe.Coerce
 \end{code}
@@ -373,10 +337,10 @@ Next, the representation of substitutions. We use a concrete representation of
 substitutions, based on the algebraic data type below. 
 \begin{code}
 $(singletons [d|
-    data Sub =
+    data Sub a =
         Inc Nat            --  increment by n (shift)                
-     |  Ty  :· Sub         --  extend a substitution (like cons)
-     |  Sub :∘  Sub        --  compose substitutions
+     |  a  :· Sub a        --  extend a substitution (like cons)
+     |  Sub a :∘  Sub a       --  compose substitutions
         deriving (Eq, Show)
 
     infixr :·    -- like usual cons operator (:)
@@ -395,16 +359,16 @@ as |(+n)| or $\uparrow^{n}$.}.
 
 For example
 \begin{spec}
-ghci> subst (Inc 2) (FnTy (VarTy 0) (VarTy 1))
+ghci> subst (Inc 2) (FnTy (VarTy Z) (VarTy 1))
 FnTy (VarTy 2) (VarTy 3)
 \end{spec}
 
 \item |ty :· s| - Extend a substitution by adding a new definition for
-    index 0 and shifting everything in |s| one step to the right.
+    index Z and shifting everything in |s| one step to the right.
 For example
 \begin{spec}
-ghci> subst (BaseTy :· Inc 0) (FnTy (VarTy 0) (VarTy 1))
-FnTy BaseTy (VarTy 0)
+ghci> subst (BaseTy :· Inc Z) (FnTy (VarTy Z) (VarTy 1))
+FnTy BaseTy (VarTy Z)
 \end{spec}
 
 \item |s1 :∘ s2| - Compose two substitutions together. This is equivalent to
@@ -418,8 +382,8 @@ zero.
 
 \begin{code}
 $(singletons [d|
-    idSub :: Sub
-    idSub = Inc Z      
+    idSub :: Sub a
+    idSub = Inc Z
     |])
 \end{code}
 
@@ -430,7 +394,7 @@ other free variables are left alone.
 
 \begin{code}
 $(singletons [d|
-    fromList :: [Ty] -> Sub
+    fromList :: [a] -> Sub a
     fromList (t:ts)  = t :· fromList ts
     fromList []      = idSub
   |])
@@ -444,12 +408,12 @@ variables in the range of |s| are all incremented by |n|.
 
 \begin{code}
 $(singletons [d|
-    lift :: Nat -> Sub -> Sub
+    lift :: Nat -> Sub Ty -> Sub Ty
     lift k s = upTo k (s :∘ Inc k)
 
-    upTo :: Nat -> Sub -> Sub
-    upTo Z      s = s
-    upTo (S m)  s = upTo m (VarTy m :· s)
+    upTo :: Nat -> Sub Ty -> Sub Ty
+    upTo Z s = s
+    upTo (S m) s = upTo m (VarTy m :· s)
     |])
 \end{code}
 
@@ -459,8 +423,8 @@ version that leaves variables 0 and 1 alone and replaces variable 2 by
 |(FnTy BaseTy (VarTy 2))|.
 
 \begin{spec}
-ghci> lift 2 ((FnTy BaseTy (VarTy 0)) :· Inc 0)
-VarTy 0 :· (VarTy 1 :· ((FnTy BaseTy (VarTy 0) :· Inc 0) :∘ Inc 2))
+ghci> lift 2 ((FnTy BaseTy (VarTy Z)) :· Inc Z)
+VarTy Z :· (VarTy 1 :· ((FnTy BaseTy (VarTy Z) :· Inc Z) :∘ Inc 2))
 \end{spec}
 
 
@@ -491,18 +455,17 @@ to that type.
 $(singletons [d|
 
     -- apply a substitution to a type
-    subst :: Sub -> Ty -> Ty
+    subst :: Sub Ty -> Ty -> Ty
     subst s BaseTy        = BaseTy
     subst s (VarTy x)     = applyS s x
     subst s (FnTy a r)    = FnTy (subst s a) (subst s r)
     subst s (PolyTy n a)  = PolyTy n (subst (lift n s) a)
               
     -- value of the index x in the substitution s
-    applyS :: Sub -> Nat -> Ty
-    applyS (Inc n)        x  = VarTy (plus n x)           
-    applyS (ty :· s)      x  = case x of
-                                 Z      -> ty
-                                 (S m)  -> applyS s m
+    applyS :: Sub Ty -> Nat -> Ty
+    applyS (Inc n)        x  = VarTy (n + x)           
+    applyS (ty :· s)      Z  = ty
+    applyS (ty :· s)   (S x) = applyS s x
     applyS (s1 :∘ s2)     x  = subst s2 (applyS s1 x)
 
                
@@ -531,13 +494,13 @@ operations on lists that we will need later.
 \begin{code}
 $(singletons [d|
               
-    substList :: Sub -> [Ty] -> [Ty]
+    substList :: Sub Ty -> [Ty] -> [Ty]
     substList s = map (subst s)                                
 
-    incList :: Nat -> [Ty] -> [Ty]
+    incList :: Nat-> [Ty] -> [Ty]
     incList n = map (subst (Inc n))
                
-    liftList :: Nat -> Sub -> [Ty] -> [Ty]
+    liftList :: Nat -> Sub Ty -> [Ty] -> [Ty]
     liftList n s = map (subst (lift n s))
 
    |])
@@ -573,7 +536,7 @@ data Exp :: [Ty] -> Ty -> Type where
   
   BaseE  :: Exp g BaseTy
   
-  VarE   :: (Idx g n ~ Just t)    -- scope requirement
+  VarE   :: (g !! n ~ t)          -- scope requirement
          => Sing n                -- variable index
          -> Exp g t
          
@@ -589,13 +552,13 @@ data Exp :: [Ty] -> Ty -> Type where
          -> Exp (IncList n g) t   -- body of type abstraction
          -> Exp g (PolyTy n t)
 
-  TyApp  :: (k ~ Length ts)       -- length requirement
+  TyApp  :: forall (k :: Nat) ts g t. (k ~ Length ts)       -- length requirement
          => Exp g (PolyTy k t)    -- polymorphic term
          -> Sing ts               -- type arguments
          -> Exp g (Subst (FromList ts) t)
 
 data Var g t where
-  V :: (Idx g n ~ Just t) => Sing n -> Var g t         
+  V :: (g !! n ~ t) => Sing n -> Var g t         
 \end{code}
 
 For example, we can use this expression to typecheck
@@ -624,9 +587,7 @@ recovering the type from a term that is known to be type correct.)
 
 \begin{code}
 typeOf :: Sing g -> Exp g t -> Sing t
-typeOf g (VarE v)       =
-  case sIdx g v of
-    SJust t -> t
+typeOf g (VarE v)       = g %!! v
 typeOf g BaseE          =
   SBaseTy
 typeOf g (LamE t1 e)    =
@@ -708,14 +669,16 @@ not a difficult "proof" to write in Haskell. Essentially the proof is an
 induction on the index |n|.
 
 \begin{code}
-lemma_SubstIdx :: (Idx g n ~ Just t) =>
+lemma_SubstIdx :: (g !! n ~ t) =>
   Sing g -> Sing n -> Sing s ->
-  Idx (SubstList s g) n :~: Just (Subst s t)
+  (SubstList s g) !! n :~: (Subst s t)
+lemma_SubstIdx = undefined
+{-
 lemma_SubstIdx (SCons _ _)   SZ     s
   = Refl
 lemma_SubstIdx (SCons _ xs)  (SS n) s
   | Refl <- lemma_SubstIdx xs n s
-  = Refl
+  = Refl -}
 \end{code}
 
 The last two branches of substTy requires more traditional proofs about type
@@ -799,12 +762,14 @@ lemma_LiftInc s k (SPolyTy n t)
   = undefined -- TODO!!!
 
 lemma_UpTo :: Sing s -> Sing k -> Sing n ->
-  ApplyS (UpTo k (s :∘ Inc k)) (Plus k n)
-  :~: Subst (Inc k) (ApplyS s n)  
+  ApplyS (UpTo k (s :∘ Inc k)) (k + n)
+  :~: Subst (Inc k) (ApplyS s n)
+lemma_UpTo = undefined
+{-
 lemma_UpTo s SZ n = Refl
 lemma_UpTo s (SS m) n 
   | Refl <- lemma_UpTo s m n
-  = undefined -- TODO!!!
+  = undefined -- TODO!!! -}
 \end{code}
 
 \begin{code}
@@ -854,9 +819,9 @@ way as the lemma above --- but note that it doesn't evaluate any of its
 arguments.
 
 \begin{code}
-axiom_SubstIdx :: (Idx g n ~ Just t) =>
+axiom_SubstIdx :: (g !! n ~ t) =>
   Sing g -> Sing n -> Sing s ->
-  Idx (SubstList s g) n :~: Just (Subst s t)
+  (SubstList s g) !! n :~: (Subst s t)
 axiom_SubstIdx _g _n _s = unsafeCoerce Refl
 \end{code}
 
@@ -958,19 +923,19 @@ datatypes, we only need to define instances of the |Arbitrary| type class for
 the datatypes |Sub| and |Ty| to be able to run these tests.
 
 \begin{code}
-prop_SubstIdx :: [Ty] -> Nat -> Sub -> Bool
+prop_SubstIdx :: [Ty] -> Nat -> Sub Ty -> Bool
 prop_SubstIdx g n s =
-    idx (substList s g) n == (subst s <$> idx g n)
+    (substList s g) !! n == (subst s (g !! n))
 \end{code}
 
 \begin{code}
-prop_LiftIncList :: [Ty] -> Sub -> Nat -> Bool
+prop_LiftIncList :: [Ty] -> Sub Ty -> Nat -> Bool
 prop_LiftIncList g s k =
     liftList k s (incList k g) == incList k (substList s g)
 \end{code}
 
 \begin{code}
-prop_SubstFromList :: Ty -> Sub -> [Ty] -> Bool
+prop_SubstFromList :: Ty -> Sub Ty -> [Ty] -> Bool
 prop_SubstFromList ty1 s tys =
   subst (fromList (substList s tys))
     (subst (lift (length tys) s) ty1)
@@ -979,7 +944,7 @@ prop_SubstFromList ty1 s tys =
 \end{code}
 
 \begin{code}
-prop_LengthSubstList :: Sub -> [Ty] -> Bool
+prop_LengthSubstList :: Sub Ty -> [Ty] -> Bool
 prop_LengthSubstList s tys =
   length (substList s tys) == length tys
 \end{code}
@@ -998,7 +963,7 @@ Second, instead of bunching up increments by providing a natural number to
 |Inc|, we instead only allow one increment at a time. We make this change to
 account for the significant increase in complexity that comes from indexing
 the types of substitutions by their associated contexts.  As a result, we need
-to also provide an indendenty substitution for incrementing by zero.
+to also provide an indendity substitution for incrementing by zero.
 \footnote{This implementation is less efficient, as it stores increments in unary.}
 
 \begin{code}
@@ -1056,12 +1021,12 @@ substE s (LamE ty e)    = LamE ty (substE (liftE1 s) e)
 substE s (TyLam k e)    = TyLam k (substE (incSubE k s) e)
 substE s (TyApp e tys)  = TyApp (substE s e) tys
 
-applyES  :: (Idx g n ~ Just ty)
+applyES  :: (g !! n ~ ty)
          => SubE g g' -> Sing n -> Exp g' ty
 applyES IdE            v       = VarE v
 applyES IncE           v       = VarE (SS v)
-applyES (ConsE e s)    SZ      = e
-applyES (ConsE e s)    (SS m)  = applyES s m
+applyES (ConsE e s)   SZ       = e
+applyES (ConsE e s)  (SS m)    = applyES s m
 applyES (CompE s1 s2)  v       = substE s2 (applyES s1 v)
 \end{code}
 
@@ -1073,9 +1038,9 @@ We can visualize substitutions as infinite lists of types, where the ith type
 in the list is the substitution for variable i.
 
 \begin{code}
-instance Index Sub where
-  type Element Sub = Ty
-  s !! x = applyS s x
+--instance Index Sub where
+--  type Element Sub = Ty
+-- s !! x = applyS s x
 \end{code}
 
 \begin{code}
@@ -1087,7 +1052,7 @@ instance Enum Ty where
 
 
 \begin{code}
-toList :: Sub -> [Ty]
+toList :: Sub Ty -> [Ty]
 toList (x :· y)           = x : toList y
 toList (Inc n)            = [VarTy n, VarTy (n + 1) ..]
 toList (s1 :∘ s2)         = substList s2 (toList s1)
@@ -1099,9 +1064,9 @@ result of |applyS| is the same as first converting the substitution to a list
 and then accessing the |n|th element.
 
 \begin{code}
-prop_applyS_toList :: Sub -> Nat -> Bool
+prop_applyS_toList :: Sub Ty -> Nat -> Bool
 prop_applyS_toList s x =
-  s !! x == toList s !! x
+  applyS s x == toList s !! x
 \end{code}
 
 (Note: in our first version of this function, quick check did not catch a bug
@@ -1132,13 +1097,13 @@ prop_substFreshList g k tys =
 ax_SubstFreshList :: forall g k tys.
   ((k <= Length tys) ~ False) =>
   SubstList (FromList tys) (IncList k g) :~:
-  IncList (Minus k (Length tys)) g
+  IncList (k - (Length tys)) g
 ax_SubstFreshList = unsafeCoerce Refl
 
 ax_SubstFresh :: forall t k tys.
   ((k <= Length tys) ~ False) =>
   Subst (FromList tys) (Subst (Inc k) t) :~:
-  Subst (Inc (Minus k (Length tys))) t
+  Subst (Inc (k - (Length tys))) t
 ax_SubstFresh = unsafeCoerce Refl
 
 
@@ -1152,13 +1117,13 @@ $(singletons [d|
         subst (fromList (take k tys)) t1
       else
         -- we don't have enough type arguments (regeneralize)
-        PolyTy (minus k (length tys)) (subst (fromList tys) t1)
+        PolyTy (k - (length tys)) (subst (fromList tys) t1)
 
     upN :: Nat -> [Ty]
     upN n = go Z where
       go m = 
         if n == m then []
-        else (VarTy m : go (S m))
+        else (VarTy m : go ((S Z) + m))
       
   |])
 
@@ -1204,7 +1169,7 @@ spec g e1 tys =
                 w = TyApp z (sUpN k)
                 
                 fact :: SubstList (FromList tys) (IncList k g) :~:
-                        IncList (Minus k (Length tys)) g
+                        IncList (k - (Length tys)) g
                 fact = Refl
                 
               in
@@ -1271,6 +1236,7 @@ eval (TyApp e tys)  =
   case eval e of
     TyLamV k e' ->
       eval (substTy (sFromList tys) e')
+eval (VarE x)       = error "hmmm"
 \end{code}
 
 
@@ -1365,16 +1331,15 @@ fi n = if n == 0 then Z
     else S (fi (n - 1))
 
 upto :: Nat -> [Nat]
-upto Z = []
-upto (S m) = m : upto m
+upto m = if m == 0 then [] else m : upto (m - 1)
   
 instance Arbitrary Nat where
   arbitrary = fi <$> arbitrary
-  shrink Z = []
-  shrink (S n) = [n]
+  shrink n = if n == 0 then [] else [n - 1]
+
 
 instance Arbitrary Ty where
-  arbitrary = sized (gt Z) where
+  arbitrary = sized (gt 0) where
     base n = oneof
        (return BaseTy : [return (VarTy k)
                         | k <- upto (fi 5) ])
@@ -1402,7 +1367,7 @@ instance Arbitrary Ty where
   shrink (PolyTy n t) = t : 
     [ PolyTy n' t' | n' <- shrink n, t' <- shrink t]
 
-instance Arbitrary Sub where
+instance Arbitrary a => Arbitrary (Sub a) where
   arbitrary = sized gt where
     base = oneof [Inc <$> arbitrary]
     gt m =

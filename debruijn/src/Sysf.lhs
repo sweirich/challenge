@@ -110,7 +110,7 @@ Text of abstract \ldots.
 {-# LANGUAGE AllowAmbiguousTypes #-}
 
 {-# OPTIONS_GHC -fwarn-incomplete-patterns -Wno-redundant-constraints #-}
-module SysF where
+module Sysf where
 
 import Imports
 import Nat

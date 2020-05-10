@@ -16,12 +16,11 @@ extra-source-files:  CHANGELOG.md, README.md
 cabal-version:       >=1.10
 
 library
-  exposed-modules:     Nat
+  exposed-modules:     Cps
   other-modules:       Imports,
+                       Nat,
                        Sysf,
                        TypeCheck,
-                       Cps,
-                       Polylam,
                        Subst,
                        Simple
   -- other-extensions:
@@ -30,7 +29,9 @@ library
                        QuickCheck >= 2.12,
                        ghc-typelits-knownnat >= 0.7.2,
                        wl-pprint >= 1.2
-  -- hs-source-dirs:
+
+  hs-source-dirs:      src
+
   default-language:    Haskell2010
   
   default-extensions:  AllowAmbiguousTypes,

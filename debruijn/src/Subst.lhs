@@ -1,4 +1,5 @@
 > {-# LANGUAGE TemplateHaskell #-}
+> {-# LANGUAGE DeriveFunctor #-}
 > 
 > module Subst where
 
@@ -10,10 +11,11 @@ substitutions, based on the algebraic data type below.
 
 > $(singletons [d|
 >     data Sub a =
->         Inc Nat                --  increment by n (shift)                
+>         IdS                    --  identity subst
+>      |  Inc                    --  increment by 1 (shift)                
 >      |  a  :· Sub a            --  extend a substitution (like cons)
 >      |  Sub a :∘  Sub a        --  compose substitutions
->          deriving (Eq, Show)
+>          deriving (Eq, Show,Functor)
 >     infixr :·    -- like usual cons operator (:)
 >     infixr :∘    -- like usual composition  (.)
 >    |])
@@ -47,7 +49,14 @@ define an identity substitution by incrementing by zero.
 
 > $(singletons [d|
 >     idSub :: Sub a
->     idSub = Inc Z
+>     idSub = IdS
+>     |])
+
+And we can also define a singleton substitution:
+
+> $(singletons [d|
+>     singleSub :: a -> Sub a
+>     singleSub t = t :· IdS
 >     |])
 
 Furthermore, we can use the cons and identity substitutions to define
@@ -63,28 +72,53 @@ other free variables are left alone.
 >     |])
 
 
-> class Subst a where
->    var   :: Nat -> a 
->    subst :: Sub a -> a -> a 
+> $(singletons [d|
+>     class SubstC a where
+>        var   :: Nat -> a 
+>        subst :: Sub a -> a -> a
 
-> -- | Value of the index x in the substitution s
-> applyS :: Subst a => Sub a -> Nat -> a
-> applyS (Inc n)        x  = var (n + x)           
-> applyS (ty :· s)      Z  = ty
-> applyS (ty :· s)   (S x) = applyS s x
-> applyS (s1 :∘ s2)     x  = subst s2 (applyS s1 x)
+>     --  Value of the index x in the substitution s
+>     applyS :: SubstC a => Sub a -> Nat -> a
+>     applyS IdS            x  = var x
+>     applyS Inc            x  = var (S x)
+>     applyS (ty :· s)      Z  = ty
+>     applyS (ty :· s)   (S x) = applyS s x
+>     applyS (s1 :∘ s2)     x  = subst s2 (applyS s1 x)
+>   |])
+
+
+> {- NOTE: optimization for above. Won't do it now.
+> applyS s x | Just f <- isIncN s = var (f x)
+> isIncN :: Sub a -> Maybe (Nat -> Nat)
+> isIncN IdS        = Just id
+> isIncN (Inc :∘ s) = (S .) <$> isIncN s
+> isIncN _          = Nothing
+> -}
 
 Finally, we can define the |lift| substitution, which is exactly what we need
-when working with substitutions under binders.  Using the substitution |lift n
-s|, all free variables in the range |0..n-1| are left alone, and any free
-variables in the range of |s| are all incremented by |n|.
+when working with substitutions under binders.
 
-> lift :: Subst a => Nat -> Sub a -> Sub a
-> lift k s = upTo k (s :∘ Inc k)
+> $(singletons [d|
+>     lift :: SubstC a => Sub a -> Sub a
+>     lift s = var Z :· (s :∘ Inc)
+>     |])
 
-> upTo :: Subst a => Nat -> Sub a -> Sub a
-> upTo Z s = s
-> upTo (S m) s = upTo m (var m :· s)
+Using the substitution |liftN n s|, all free variables in the range |0..n-1|
+are left alone, and any free variables in the range of |s| are all incremented
+by |n|.
+
+> $(singletons [d|
+>     liftN :: SubstC a => Nat -> Sub a -> Sub a
+>     liftN k s = upTo k (s :∘ incN k)
+>
+>     incN :: SubstC a => Nat -> Sub a
+>     incN Z = IdS
+>     incN (S n) = (Inc :∘ incN n)
+
+>     upTo :: SubstC a => Nat -> Sub a -> Sub a
+>     upTo Z s     = s
+>     upTo (S m) s = upTo m (var m :· s)
+>   |])
 
 For example, if have a substitution that replaces 0 with |FnTy (BaseTy) (VarTy
 0)| and leaves all other types alone, we can lift it by two steps to the
@@ -116,3 +150,16 @@ returns the type |ty|. If not, it decrements the index and looks up the value
 in the substition in the tail.  For composition, it first determines the value
 of the index in the first substitution, then applies the second substitution
 to that type.
+
+> $(singletons [d|
+>      substList :: SubstC a => Sub a -> [a] -> [a]
+>      substList s [] = []
+>      substList s (t:g) = subst s t : substList s g
+>
+>      incList :: SubstC a => [a] -> [a]
+>      incList = substList Inc
+>
+>      liftList :: SubstC a => Sub a -> [a] -> [a]
+>      liftList s = substList (lift s)
+>      |])
+

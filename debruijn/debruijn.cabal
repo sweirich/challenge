@@ -19,10 +19,15 @@ library
   exposed-modules:     Cps
   other-modules:       Imports,
                        Nat,
-                       Sysf,
+                       SystemF,
                        TypeCheck,
                        Subst,
-                       Simple
+                       SubstProperties,
+                       SubstTyped,
+                       Simple,
+                       SimpleTyped,
+                       Poly,
+                       PolyTyped
   -- other-extensions:
   build-depends:       base >=4.13,
                        singletons >= 2.6,

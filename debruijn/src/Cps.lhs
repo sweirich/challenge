@@ -14,7 +14,7 @@ import Debug.Trace
 
 import Imports
 import Nat
-import SysF
+import SystemF
 \end{code}
 %endif
 

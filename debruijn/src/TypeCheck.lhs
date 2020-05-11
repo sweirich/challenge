@@ -6,7 +6,7 @@ import Test.QuickCheck hiding ((===))
 
 import Imports
 import Nat
-import SysF
+import SystemF
 
 import Debug.Trace
 

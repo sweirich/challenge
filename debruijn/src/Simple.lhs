@@ -5,53 +5,49 @@
 
 > import Imports
 > import Nat
+> import Subst
 
-Let's start with an example of the simply-typed lambda calculus (STLC), using a
-strongly typed term representation.
+Let's start with an example of the simply-typed lambda calculus (STLC).
 
-First, we need some types, a base type and a form for function types.
+First, we need some types.
 
-> $(singletons [d| data Ty = Base | Ty :-> Ty |])
+> data Ty = IntTy | Ty :-> Ty
+>   deriving (Eq, Show)
 
-Now, let's define the syntax of STLC using a GADT.
+Now, let's define the syntax of STLC.
 
-> type Context = [Ty]
+> data Exp :: Type where
 
-> data Exp :: Context -> Ty -> Type where
+>  IntE   :: Int -> Exp
+>  VarE   :: Nat
+>         -> Exp 
+>  LamE   :: Ty       -- type of binder
+>         -> Exp      -- body of abstraction
+>         -> Exp          
+>  AppE   :: Exp      -- function
+>         -> Exp      -- argument
+>         -> Exp
+>    deriving (Eq, Show)
 
->  BaseE  :: Exp g Base
-  
->  VarE   :: (g !! n ~ t)          -- scope requirement
->         => Sing n                -- variable index
->         -> Exp g t
-         
->  LamE   :: Sing t1               -- type of binder
->         -> Exp (t1:g) t2         -- body of abstraction
->         -> Exp g (t1 :-> t2)
-         
->  AppE   :: Exp g (t1 :-> t2)     -- function
->         -> Exp g t1              -- argument
->         -> Exp g t2
+Let's write a small-step substitution-based evaluator for this language.
 
-Let's write a safe evaluator for this language.
+> eval :: Exp -> Exp
+> eval (AppE e1 e2) = 
+>    case eval e1 of
+>       LamE ty e11 -> subst (singleSub e2) e11
+>       _ -> error "Type Error!"
+> eval (IntE x) = IntE x
+> eval (VarE x) = error $ "Unbound variable: " ++ show x
+> eval (LamE ty e) = LamE ty e
 
 
-> type family Interp (t :: Ty) :: Type where
->    Interp Base        = ()
->    Interp (t1 :-> t2) = Interp t1 -> Interp t2
-
-> eval :: Env g -> Exp g t -> Interp t
-> eval env BaseE    = ()
-> eval env (VarE n) = lookupEnv env n
-> eval env (LamE _ e) = \ x -> eval (ECons x env) e
-> eval env (AppE e1 e2) = (eval env e1) (eval env e2)
-
-> data Env (g :: Context) where
->    ENil  :: Env '[]
->    ECons :: Interp t -> Env g -> Env (t ': g)
+> instance SubstC Exp where
+>    var = VarE
 > 
-> lookupEnv :: (g !! n ~ t) => Env g -> Sing n -> Interp t
-> lookupEnv ENil SZ = error "impossible"
-> lookupEnv ENil (SS n) = error "impossible"
-> lookupEnv (ECons x xs) SZ = x
-> lookupEnv (ECons x xs) (SS n) = lookupEnv xs n
+>    subst s (IntE x)     = (IntE x)
+>    subst s (VarE x)     = applyS s x
+>    subst s (LamE ty e)  = LamE ty (subst (lift s) e)
+>    subst s (AppE e1 e2) = AppE (subst s e1) (subst s e2)
+
+
+

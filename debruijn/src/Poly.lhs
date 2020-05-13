@@ -1,22 +1,20 @@
+>
+>
 > module Poly where
 
 > import Imports
-> import Nat
 > import Subst
 
-> data Ty = IntTy | Ty :-> Ty | VarTy Nat | PolyTy Ty
+* Syntax
 
-> instance SubstC Ty where
->     var = VarTy
+Now, let's go to a version with polymorphic types.
 
->     subst s IntTy       = IntTy
->     subst s (t1 :-> t2) = subst s t1 :-> subst s t2
->     subst s (VarTy x)   = applyS s x
->     subst s (PolyTy t)  = PolyTy (subst (lift s) t)
+> data Ty = IntTy | Ty :-> Ty | VarTy Idx | PolyTy Ty
 
 > data Exp :: Type where
->  IntE   :: Int -> Exp
->  VarE   :: Nat
+>  IntE   :: Int
+>         -> Exp
+>  VarE   :: Idx
 >         -> Exp 
 >  LamE   :: Ty       -- type of binder
 >         -> Exp      -- body of abstraction
@@ -30,6 +28,19 @@
 >         -> Ty       -- type argument
 >         -> Exp
 
+* Substitution
+
+In this version, we need to definition three kinds of substitutions. For types
+in types, for terms in terms, and for types in terms.
+
+> instance SubstC Ty where
+>     var = VarTy
+
+>     subst s IntTy       = IntTy
+>     subst s (t1 :-> t2) = subst s t1 :-> subst s t2
+>     subst s (VarTy x)   = applyS s x
+>     subst s (PolyTy t)  = PolyTy (subst (lift s) t)
+
 > instance SubstC Exp where
 >    var = VarE
 > 
@@ -37,10 +48,11 @@
 >    subst s (VarE x)     = applyS s x
 >    subst s (LamE ty e)  = LamE ty (subst (lift s) e)
 >    subst s (AppE e1 e2) = AppE (subst s e1) (subst s e2)
->    subst s (TyLam e)    = TyLam (subst s e)
+>    subst s (TyLam e)    = TyLam (subst (substTy_Sub Inc s) e)    --- note, this line is hard to motivate
 >    subst s (TyApp e t)  = TyApp (subst s e) t
 
-> -- | apply a type substitution in a term
+Apply a type substitution in a term
+
 > substTy :: Sub Ty -> Exp -> Exp
 > substTy s (IntE x)     = IntE x
 > substTy s (VarE n)     = VarE n
@@ -48,6 +60,16 @@
 > substTy s (AppE e1 e2) = AppE (substTy s e1) (substTy s e2)
 > substTy s (TyLam e)    = TyLam (substTy (lift s) e)
 > substTy s (TyApp e t)  = TyApp (substTy s e) (subst s t)
+
+Apply a type substitution in a term substitution
+
+> substTy_Sub :: Sub Ty -> Sub Exp -> Sub Exp 
+> substTy_Sub s IdS         = IdS
+> substTy_Sub s Inc         = Inc
+> substTy_Sub s (e   :· s1) = substTy s e :· substTy_Sub s s1
+> substTy_Sub s (s1 :<> s2) = substTy_Sub s s1 :<> substTy_Sub s s2
+
+* Examples
 
 > -- | is an expression a value?
 > value :: Exp -> Bool

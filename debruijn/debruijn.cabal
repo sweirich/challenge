@@ -42,6 +42,7 @@ library
   default-extensions:  AllowAmbiguousTypes,
                        DataKinds,
                        DefaultSignatures,
+                       DeriveFunctor,
                        EmptyCase,
                        ExistentialQuantification,
                        FlexibleContexts,
@@ -63,4 +64,4 @@ library
                        TypeOperators,
                        UndecidableInstances
 
---  ghc-options:         -fplugin GHC.TypeLits.KnownNat.Solver
+ghc-options:           -fwarn-incomplete-patterns 

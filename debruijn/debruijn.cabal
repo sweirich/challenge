@@ -16,24 +16,23 @@ extra-source-files:  CHANGELOG.md, README.md
 cabal-version:       >=1.10
 
 library
-  exposed-modules:     Cps
+  exposed-modules:     TypeCheck
   other-modules:       Imports,
                        Nat,
-                       SystemF,
-                       TypeCheck,
                        Subst,
+                       SubstScoped,
                        SubstProperties,
                        SubstTyped,
                        Simple,
+                       SimpleScoped,
                        SimpleTyped,
                        Poly,
-                       PolyTyped
+                       PolyTyped,
+                       Cps
   -- other-extensions:
   build-depends:       base >=4.13,
                        singletons >= 2.6,
-                       QuickCheck >= 2.12,
-                       ghc-typelits-knownnat >= 0.7.2,
-                       wl-pprint >= 1.2
+                       QuickCheck >= 2.12
 
   hs-source-dirs:      src
 
@@ -64,4 +63,4 @@ library
                        TypeOperators,
                        UndecidableInstances
 
-ghc-options:           -fwarn-incomplete-patterns 
+  ghc-options:         -fwarn-incomplete-patterns

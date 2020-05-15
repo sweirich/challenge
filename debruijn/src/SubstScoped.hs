@@ -1,13 +1,8 @@
-{-# LANGUAGE TemplateHaskell #-}
 -- | Indexing the substitution by a scope, i.e. binding depth
 module SubstScoped where
 
 import Imports
-
--- | Natural numbers and their singletons
-$(singletons [d|
-    data Nat = Z | S Nat  deriving (Eq)
-  |])
+import Nat 
 
 -- In this file, we will call nats "Scopes". I.e. they 
 -- are used to describe the number of free variables allowed in 
@@ -38,11 +33,11 @@ data Vec (n :: Nat) (a :: Type) where
 -- Access a list element by its index
 -- Never fails because we know the index will be
 -- in range.
-indx :: Vec n a -> Idx n -> a
-indx v FZ = case v of 
+index :: Vec n a -> Idx n -> a
+index v FZ = case v of 
     (VCons x _) -> x
-indx v (FS n) = case v of 
-    (VCons _ xs) -> indx xs n
+index v (FS n) = case v of 
+    (VCons _ xs) -> index xs n
 
 -- A substitution Algebra
 -- The parameter 'a' is scope-indexed (i.e. the type 
@@ -50,13 +45,19 @@ indx v (FS n) = case v of
 -- appear in the term.)
 -- Substitution takes terms from scope n to scope m 
 data Sub (a :: Nat -> Type) (n :: Nat) (m :: Nat) where
-    IdS   :: Sub a n n                               --  identity subst
-    Inc   :: Sub a n (S n)                           --  increment by 1 (shift)                
-    (:·)  :: a m -> Sub a n m -> Sub a (S n) m       --  extend a substitution (like cons)
+--    IdS   :: Sub a n n                             --  identity subst
+    Inc   :: Sing m -> Sub a n (m + n)               --  increment by 1 (shift)                
+    (:>)  :: a m -> Sub a n m -> Sub a (S n) m       --  extend a substitution (like cons)
     (:<>) :: Sub a m n -> Sub a n p -> Sub a m p     --  compose substitutions
 
-infixr :·     -- like usual cons operator (:)
+infixr :>     -- like usual cons operator (:)
 infixr :<>    -- like usual composition  (.)
+
+idSub :: Sub a n n 
+idSub = Inc SZ
+
+incSub :: Sub a n (S n)
+incSub = Inc (SS SZ)
 
 -- The var construction must bound the index by the scope
 -- for the term
@@ -64,19 +65,23 @@ class SubstC (a :: Nat -> Type) where
    var   :: Idx n -> a n
    subst :: Sub a n m -> a n -> a m
 
+add :: Sing m -> Idx n -> Idx (m + n)
+add SZ x = x
+add (SS m) x = FS (add m x)
+
 --  Value of the index x in the substitution s
 applyS :: SubstC a => Sub a n m -> Idx n -> a m
-applyS IdS            x  = var x
-applyS Inc            x  = var (FS x)
-applyS (ty :· s)     FZ  = ty
-applyS (ty :· s)  (FS x) = applyS s x
+--applyS IdS            x  = var x
+applyS (Inc m)        x  = var (add m x)
+applyS (ty :> s)     FZ  = ty
+applyS (ty :> s)  (FS x) = applyS s x
 applyS (s1 :<> s2)    x  = subst s2 (applyS s1 x)
 
 singleSub :: a n -> Sub a (S n) n
-singleSub t = t :· IdS
+singleSub t = t :> idSub
 
 lift :: SubstC a => Sub a n m -> Sub a (S n) (S m)
-lift s = var FZ :· (s :<> Inc)
+lift s = var FZ :> (s :<> incSub)
 
 
 

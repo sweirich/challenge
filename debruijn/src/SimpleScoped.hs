@@ -2,6 +2,7 @@
 module SimpleScoped where
 
 import Imports
+import Nat
 import SubstScoped
 
 -- Syntax of Simply-Typed Lambda Calculus (STLC) types
@@ -52,10 +53,10 @@ value _          = False
 -- | Small-step evaluation
 step :: Exp Z -> Maybe (Exp Z)
 step (IntE x)   = Nothing
-step (VarE n)   = case n of {}
+step (VarE n)   = case n of {}   -- cannot have a scope error any more
 step (LamE t e) = Nothing
 step (AppE (LamE t e1) e2)   = Just $ subst (singleSub e2) e1
-step (AppE e1 e2) | value e1 = error "Type error!"
+step (AppE (IntE _) e2)      = error "Type error!"
 step (AppE e1 e2) = do e1' <- step e1
                        return $ AppE e1' e2
 
@@ -65,6 +66,6 @@ reduce (IntE x)   = IntE x
 reduce (VarE n)   = VarE n
 reduce (LamE t e) = LamE t (reduce e)
 reduce (AppE (LamE t e1) e2)   = subst (singleSub (reduce e2)) (reduce e1)
-reduce (AppE e1 e2) | value e1 = error "Type error!"
+reduce (AppE (IntE x) e2) = error "Type error!"
 reduce (AppE e1 e2) = AppE (reduce e1) (reduce e2)
 

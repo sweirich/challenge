@@ -2,7 +2,6 @@
 module SimpleTyped where
 
 import Imports
--- need a typed version of the substitution
 import SubstTyped
 
 -- Same definition of types as in Simple
@@ -45,10 +44,10 @@ value _          = False
 -- | Small-step evaluation
 step :: Exp '[] t -> Maybe (Exp '[] t)
 step (IntE x)   = Nothing
-step (VarE n)   = error "Unbound Variable"
+step (VarE n)   = case n of {}
 step (LamE t e) = Nothing
 step (AppE (LamE t e1) e2)   = Just $ subst (singleSub e2) e1
-step (AppE e1 e2) | value e1 = error "Type error!"
+--step (AppE (IntE x) e2)      = error "Type error!"
 step (AppE e1 e2) = do e1' <- step e1
                        return $ AppE e1' e2
 

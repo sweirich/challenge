@@ -8,7 +8,7 @@ module Nat (
   plus,Plus(..),sPlus,PlusSym0,
   type(+),(%+),type(+@#@$),
   mul,Mul(..),sMul,MulSym0,
-  type(*),(%*),type(*@#@$),
+  (%*),type(*@#@$),
   minus,Minus(..),sMinus,MinusSym0,
   type(-),(%-),type(-@#@$),
 
@@ -21,19 +21,18 @@ module Nat (
   (!!), type (!!), (%!!), type (!!@#@$),
 
   -- safe indexing
-  idx, Idx, sIdx, IdxSym0,
+  indx, Indx, sIndx, IndxSym0,
 
-  prop_natLength_take,
+  prop_Length_take,
   ax_Length_Take,
-  proof_Length_Pred,
-  proof_Length_Take,
+  proof_Length_Pred
 
 ) where
 
 import Prelude hiding ((!!), take, drop, length)
 import Imports 
 
-import Test.QuickCheck((==>))
+import Test.QuickCheck((==>),Property,Arbitrary(..),oneof)
 import Unsafe.Coerce(unsafeCoerce)
 
 $(singletons [d|
@@ -71,16 +70,15 @@ $(singletons [d|
     (x:xs) !! (S n)     =  xs !! n
     infixl 9 !!
 
-    idx :: [a] -> Nat -> Maybe a
-    idx (x:_)  Z     = Just x
-    idx (_:xs)(S n)  = idx xs n
-    idx []    n      = Nothing
+    indx :: [a] -> Nat -> Maybe a
+    indx (x:_)  Z     = Just x
+    indx (_:xs)(S n)  = indx xs n
+    indx []    n      = Nothing
     
     |])
 
 type a + b = Plus a b
 type a - b = Minus a b
-type a * b = Mul a b
 
 type (+@#@$) = PlusSym0
 type (-@#@$) = MinusSym0
@@ -114,9 +112,8 @@ natToInt :: Nat -> Int
 natToInt Z = 0
 natToInt (S m) = 1 + natToInt m
 
-
 instance Show Nat where
-  show = show . natToInt  where
+  show = show . natToInt 
 
 {-
 Here is a simple proof about the take operation. If the argument k is smaller
@@ -147,13 +144,13 @@ ax_Length_Take :: forall k xs.
 ax_Length_Take = unsafeCoerce Refl
 
 
-
-prop_natLength_take k xs =
+prop_Length_take :: Nat -> [a] -> Property
+prop_Length_take k xs =
   k <= length xs ==> length (take k xs) == k
 
 
 
-
+-- {
 -- This example exceeds the ability of GHC's exhaustiveness checker
 -- there is a warning if the last line is missing and
 -- a warning if it is present
@@ -164,8 +161,11 @@ proof_Length_Pred _ = unsafeCoerce Refl
 -- proof_Length_Pred SZ (SCons x xs) = Refl
 -- proof_Length_Pred (SS j) (SCons x xs) = proof_Length_Pred j xs
 -- proof_Length_Pred (SS j) SNil = error "impossible"
-  
+--}  
 
-compile_test1 :: 'Z + n :~: n
-compile_test1 = Refl
 
+
+instance Arbitrary Nat where
+  arbitrary = oneof [ return Z, S <$> arbitrary ]
+  shrink Z     = []
+  shrink (S n) = [n]

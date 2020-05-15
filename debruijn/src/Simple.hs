@@ -2,6 +2,7 @@
 module Simple where
 
 import Imports
+import Nat
 import Subst
 
 -- Syntax of Simply-Typed Lambda Calculus (STLC) types
@@ -25,14 +26,6 @@ data Exp :: Type where
          -> Exp
      deriving (Eq, Show)
 
--- Our implementation of de Brujn indices relies on a type class
--- to overload the substitution operation. 
--- In the variable case, we need to look up the index in the substitution 
--- (using `applyS`).
--- When recursing under binders, we need to `lift` the indices in the 
--- substitution one step. (i.e. what was at index 0 in the substitution is 
--- now at index 1, etc.)
-
 instance SubstC Exp where
    var = VarE
 
@@ -41,6 +34,7 @@ instance SubstC Exp where
    subst s (LamE ty e)  = LamE ty (subst (lift s) e)
    subst s (AppE e1 e2) = AppE (subst s e1) (subst s e2)
 
+-------------------------------------------------------------------------
 -- * Examples of some operations defined using this representation.
 
 -- | is an expression a value?
@@ -68,3 +62,17 @@ reduce (AppE (LamE t e1) e2)   = subst (singleSub (reduce e2)) (reduce e1)
 reduce (AppE e1 e2) | value e1 = error "Type error!"
 reduce (AppE e1 e2) = AppE (reduce e1) (reduce e2)
 
+-- | Type checker
+typeCheck :: [Ty] -> Exp -> Maybe Ty
+typeCheck g (IntE i)    = return IntTy
+typeCheck g (VarE j)    = indx g j
+typeCheck g (LamE t1 e) = do
+  t2 <- typeCheck (t1:g) e
+  return (t1 :-> t2)
+typeCheck g (AppE e1 e2) = do
+  t1 <- typeCheck g e1
+  t2 <- typeCheck g e2
+  case t1 of
+    t12 :-> t22
+      | t12 == t2 -> Just t22
+    _ -> Nothing

@@ -2,6 +2,7 @@
 module Poly where
 
 import Imports
+import Nat
 import Subst
 
 $(singletons [d|
@@ -45,7 +46,8 @@ instance SubstC Exp where
    subst s (VarE x)     = applyS s x
    subst s (LamE ty e)  = LamE ty (subst (lift s) e)
    subst s (AppE e1 e2) = AppE (subst s e1) (subst s e2)
-   subst s (TyLam e)    = TyLam (subst (substTySub Inc s) e)    --- note, this line is hard to motivate
+   subst s (TyLam e)    = TyLam (subst (fmap (substTy incSub) s) e)  
+            --- note, this line is hard to motivate
    subst s (TyApp e t)  = TyApp (subst s e) t
 
 substTy :: Sub Ty -> Exp -> Exp
@@ -56,11 +58,15 @@ substTy s (AppE e1 e2) = AppE (substTy s e1) (substTy s e2)
 substTy s (TyLam e)    = TyLam (substTy (lift s) e)
 substTy s (TyApp e t)  = TyApp (substTy s e) (subst s t)
 
-substTySub :: Sub Ty -> Sub Exp -> Sub Exp 
-substTySub s IdS         = IdS
-substTySub s Inc         = Inc
-substTySub s (e   :· s1) = substTy s e :· substTySub s s1
+{-
+liftTySub :: Sub Exp -> Sub Exp 
+liftTySub = fmap (substTy incSub)
+-}
+{-
+substTySub s (Inc i)     = Inc i
+substTySub s (e   :> s1) = substTy s e :> substTySub s s1
 substTySub s (s1 :<> s2) = substTySub s s1 :<> substTySub s s2
+-}
 
 -- | is an expression a value?
 value :: Exp -> Bool
@@ -99,24 +105,24 @@ reduce (TyApp e t) = TyApp (reduce e) t
 
 
 -- | Type checker
-utc :: [Ty] -> Exp -> Maybe Ty
-utc g (IntE i)    = return IntTy
-utc g (VarE j)    = indx g j
-utc g (LamE t1 e) = do
-  t2 <- utc (t1:g) e
+typeCheck :: [Ty] -> Exp -> Maybe Ty
+typeCheck g (IntE i)    = return IntTy
+typeCheck g (VarE j)    = indx g j
+typeCheck g (LamE t1 e) = do
+  t2 <- typeCheck (t1:g) e
   return (t1 :-> t2)
-utc g (AppE e1 e2) = do
-  t1 <- utc g e1
-  t2 <- utc g e2
+typeCheck g (AppE e1 e2) = do
+  t1 <- typeCheck g e1
+  t2 <- typeCheck g e2
   case t1 of
     t12 :-> t22
       | t12 == t2 -> Just t22
     _ -> Nothing
-utc g (TyLam e) = do
-  ty <- utc (map (subst Inc) g) e
+typeCheck g (TyLam e) = do
+  ty <- typeCheck (map (subst incSub) g) e
   return (PolyTy ty)
-utc g (TyApp e ty) = do
-  ty0 <- utc g e
+typeCheck g (TyApp e ty) = do
+  ty0 <- typeCheck g e
   case ty0 of
     PolyTy ty1 -> Just (subst (singleSub ty) ty1)
     _ -> Nothing

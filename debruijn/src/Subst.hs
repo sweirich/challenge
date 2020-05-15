@@ -1,68 +1,63 @@
  {-# LANGUAGE TemplateHaskell #-}
 module Subst where
 
+import Nat
 import Imports
-import GHC.Exts
 
 $(singletons [d|
 
     -- An index: (i.e. just a natural number)
-    data Idx where
-       Z :: Idx
-       S :: Idx -> Idx
-        deriving (Eq, Show)
+    type Idx = Nat
 
-    -- Access a list element by its index
-    -- Fails if the index is longer than the length of the list
-    indx :: [a] -> Idx -> Maybe a
-    indx [] Z = Nothing
-    indx (x:xs) Z = Just x
-    indx (x:xs) (S n)= indx xs n
-
-   -- A substitution Algebra
+   -- A substitution algebra
     data Sub a =
-       IdS                  --  identity subst
-     | Inc                  --  increment by 1 (shift)                
-     | a :· Sub a           --  extend a substitution (like cons)
+       Inc Idx              --  increment by an index amount                
+     | a :> Sub a           --  extend a substitution (like cons)
      | Sub a :<> Sub a      --  compose substitutions
-            deriving (Eq, Show, Functor) 
+        deriving (Eq, Show, Functor) 
 
-    infixr :·     -- like usual cons operator (:)
+    infixr :>     -- like usual cons operator (:)
     infixr :<>    -- like usual composition  (.)
  
-    class SubstC a where
-       var   :: Idx -> a 
-       subst :: Sub a -> a -> a
+    -- identity substitution, leaves all variables alone
+    idSub :: Sub a 
+    idSub = Inc Z
 
-    
+    -- increment, shifts all variable by one
+    incSub :: Sub a 
+    incSub = Inc (S Z) 
+
+    -- singleton, replace 0 with t, leave everything
+    -- else alone
+    singleSub :: a -> Sub a
+    singleSub t = t :> idSub
+
+    -- General class for terms that support substitution
+    class SubstC a where
+       -- variable data constructor
+       var   :: Idx -> a 
+       -- term traversal
+       subst :: Sub a -> a -> a
 
     --  Value of the index x in the substitution s
     applyS :: SubstC a => Sub a -> Idx -> a
-    applyS IdS            x  = var x
-    applyS Inc            x  = var (S x)
-    applyS (ty :· s)      Z  = ty
-    applyS (ty :· s)   (S x) = applyS s x
+    applyS (Inc k)        x  = var (plus k x)
+    applyS (ty :> s)      Z  = ty
+    applyS (ty :> s)   (S x) = applyS s x
     applyS (s1 :<> s2)    x  = subst s2 (applyS s1 x)
  
-    singleSub :: a -> Sub a
-    singleSub t = t :· IdS
-
+    -- Used in substitution when going under a binder
     lift :: SubstC a => Sub a -> Sub a
-    lift s = var Z :· (s :<> Inc)
+    lift s = var Z :> (s :<> incSub)
  
     substList :: SubstC a => Sub a -> [a] -> [a]
     substList s = map (subst s)
-    --substList s [] = []
-    --substList s (t:g) = subst s t : substList s g
  
     incList :: SubstC a => [a] -> [a]
-    incList = substList Inc
+    incList = substList incSub
  
     liftList :: SubstC a => Sub a -> [a] -> [a]
     liftList s = substList (lift s)
-
-    --fromList :: [a] -> Sub a
-    --fromList = foldr (:·) IdS
 
  |])
 
@@ -84,7 +79,7 @@ $(singletons [d|
 
     upTo :: SubstC a => Nat -> Sub a -> Sub a
     upTo Z s     = s
-    upTo (S m) s = upTo m (var m :· s)
+    upTo (S m) s = upTo m (var m :> s)
   |])
 
 -}

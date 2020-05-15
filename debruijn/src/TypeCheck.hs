@@ -5,6 +5,7 @@ import Prelude hiding ((!!),(>>),drop,take,length)
 import Test.QuickCheck hiding ((===))
 
 import Imports
+import qualified Nat as P
 import qualified Subst as P
 import qualified Poly as P
 import SubstTyped

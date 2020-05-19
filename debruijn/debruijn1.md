@@ -1,7 +1,6 @@
 # Part I: A tutorial on substitution with de Bruijn indices
 
-*Reference files:* [Subst](src/Subst.hs) and 
-   [Simple](src/Simple.hs)
+*Reference files:* [Subst](src/Subst.hs) and [Simple](src/Simple.hs)
 
 ## Representing binding with de Bruijn indices
 
@@ -23,9 +22,9 @@ Then the lambda calculus expression `\x y -> x` can be represented with the expr
 LamE IntTy (LamE IntTy (VarE 1))
 ```
 
-showing that the variable inside the term resolves to not the closest enclosing lamba (index 0) but the next one (index 1).
+showing that the variable inside the term resolves to not the closest enclosing lambda (index 0) but the next one (index 1).
 
-Similarly, the lambda calculus expreesion `\x -> (\y -> x y) x` can be represented with the expression
+Similarly, the lambda calculus expression `\x -> (\y -> x y) x` can be represented with the expression
 
 ```haskell
 LamE t1 (AppE (LamE t2 (AppE (VarE 1) (VarE 0))) (VarE 0)
@@ -57,7 +56,7 @@ To visualize how this works, we will work with parallel substitutions, i.e. we  
 type Sub = Idx -> Exp
 ```
 
-Then the substitution operation, called `subst` below, takes a `Sub` and applies it to *all* variable occurences found in the term, both bound and free.
+Then the substitution operation, called `subst` below, takes a `Sub` and applies it to *all* variable occurrences found in the term, both bound and free.
 
 ```haskell
 subst :: Sub -> Exp -> Exp
@@ -100,7 +99,7 @@ With `<|`, we can define `single` as
 single n = n <| nil
 ```
 
-Furthermore, because substitutions are functions, we should be able to compose them. We can do this by using the `subst` operation above to apply the second substition to the result of looking up the index with the first substition. 
+Furthermore, because substitutions are functions, we should be able to compose them. We can do this by using the `subst` operation above to apply the second substitution to the result of looking up the index with the first substitution. 
 
 ```haskell
 (<>) :: Sub -> Sub -> Sub
@@ -119,7 +118,7 @@ The narrative above describes all that we want to do with substitutions. That me
 
 ```haskell
 data Sub  =
-    Inc Idx         -- primtive increment
+    Inc Idx         -- primitive increment
   | Exp :<| Sub     -- extend (i.e. cons)
   | Sub :<> Sub     -- compose
 
@@ -135,7 +134,7 @@ The advantage of the defunctionalized version is that (1) it is easier for us to
 
 ### Generic substitutions
 
-The above development specializes the `Sub` datatype and associated operations to `Exp`. Do we need to repeat this code everytime we want to implement lift? Looking closely above, there are only two places that depend on the type `Exp`: the use of `Var` in the first line of `applyS` and the actual traversal of the datatype in the definition of `subst`. 
+The above development specializes the `Sub` datatype and associated operations to `Exp`. Do we need to repeat this code every time we want to implement lift? Looking closely above, there are only two places that depend on the type `Exp`: the use of `Var` in the first line of `applyS` and the actual traversal of the datatype in the definition of `subst`.
 
 Therefore, we can define a type class to classify all types that have these operations:
 
@@ -158,6 +157,6 @@ instance SubstC Exp where
 
 NOTES
 
-[1]: Occaisionally, we can work in a setting where we don't need to worry about one or tw of these issues. For example, if we only need to model a small-step operational semantics for closed terms, we don't need to worry about variable capture during substitution and can ignore (2). Alternatively, if we use a locally-nameless representation, we never substitute into terms with free variables, so we can ignore (3).
+[1]: Occasionally, we can work in a setting where we don't need to worry about one or tw of these issues. For example, if we only need to model a small-step operational semantics for closed terms, we don't need to worry about variable capture during substitution and can ignore (2). Alternatively, if we use a locally-nameless representation, we never substitute into terms with free variables, so we can ignore (3).
 
 [2]: We could also use generic programming to automatically derive the definition of `subst`, using techniques such as in the `Unbound` library.*

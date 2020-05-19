@@ -10,7 +10,7 @@ We will also add type parameters to the substitution operation (and reified subs
 
 Note that we won't change the actual code in either the Subst or Simple modules. The implementation of substitution will be exactly the same as before. All of the action will be in the types.
 
-In otherwords, our goal will be to fill in the `???` in the types below to make the types more informative in the [Subst](src/Subst.hs) module (which gives us a general purpose infrastructure for substiution):
+In other words, our goal will be to fill in the `???` in the types below to make the types more informative in the [Subst](src/Subst.hs) module (which gives us a general purpose infrastructure for substitution):
 
 ```haskell
 -- What context are we indexing into? What do we find?
@@ -25,7 +25,7 @@ data Sub a ??? where
    (:<>) :: Sub a ??? -> Sub a ??? -> Sub a ???
 
 -- What type of term do we get when we look up an `Idx` in the substitution? 
-applyS :: SubctC a => Sub a ??? -> Idx ??? -> a ???
+applyS :: SubstC a => Sub a ??? -> Idx ??? -> a ???
 applyS (Inc n)       x  = var (add n x)
 applyS (ty :< s)     Z  = ty
 applyS (ty :< s)  (S x) = applyS s x
@@ -81,7 +81,7 @@ The `Exp` GADT below has two type parameters:
 
 1. The first (of kind `[Ty]`) is a typing context that provides the types of the free variables in the expression.
 
-   With de Brujn indices, this context can be represented using a *type-level* list of types where the *i-th* type in the list is the type of the *i-th* free variable.
+   With de Bruijn indices, this context can be represented using a *type-level* list of types where the *i-th* type in the list is the type of the *i-th* free variable.
 
 2. The second (of kind `Ty`) is the type of the entire expression.
 
@@ -117,7 +117,7 @@ For lambda expressions, we need to connect the runtime type parameter
 
 ### Typed indices
 
-In the last part, we just used natural numbers as our debruijn indices. We will do the same here, except that we can give this version of the natural numbers a type that explicitly indicates that they are an index into a (generic) list.
+In the last part, we just used natural numbers as our de Bruijn indices. We will do the same here, except that we can give this version of the natural numbers a type that explicitly indicates that they are an index into a (generic) list.
 
 ```haskell
 data Idx (g::[a]) (t::a) :: Type where
@@ -175,7 +175,7 @@ If we increment by 0, i.e. using `IZ` then our type normalizes to the expected t
 nil = Inc IZ
 ```
 
-Similarly, the `lift` and `singleSub` operations have inferrabel types. The only change is the adoption of the `IncBy` datatype. (NOTE: if we were in Agda, we could overload the data constructors for `Z` and `S`, but then would not be able to infer the type automatically.)
+Similarly, the `lift` and `singleSub` operations have inferrable types. The only change is the adoption of the `IncBy` datatype. (NOTE: if we were in Agda, we could overload the data constructors for `Z` and `S`, but then would not be able to infer the type automatically.)
 
 ```haskell
 --singleSub :: a g t -> Sub a (t:g) g

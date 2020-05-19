@@ -4,10 +4,10 @@
 
 This project demonstrates how to define a strongly-typed term representation for System F terms in GHC using the singletons library.
 
-The explanation is accompanied by the fully worked out example code in the github repostory.
+The explanation is accompanied by the fully worked out example code in the github repository.
 
 *Why strongly-typed ASTs?*
-With a strongly-typed term representation, only well-typed terms can be constructed. Language tools that manipulate such datastructures can be sure that certain invariants are maintained by the system. For example, the definition of capture-avoiding substitution can be difficult to get correct from scratch. By working with a typed representation, we can be sure that there are no scope-errors in our interpreters, compilers and optimizers and that our transformations are type preserving.
+With a strongly-typed term representation, only well-typed terms can be constructed. Language tools that manipulate such data structures can be sure that certain invariants ≥are maintained by the system. For example, the definition of capture-avoiding substitution can be difficult to get correct from scratch. By working with a typed representation, we can be sure that there are no scope-errors in our interpreters, compilers and optimizers and that our transformations are type preserving.
 
 *Disclaimer*: there is a long-standing discussion in the Haskell community about the use of fancy types in industrial-strength libraries. This project does not describe an industrial use of Haskell so does not add *anything* to that discussion. Indeed, it's not at all clear that you would want to use this approach in your compiler for your polymorphic language. Although variable binding is difficult to get right, there are already tools, such as [Unbound](https://hackage.haskell.org/package/unbound) and [Bound](https://hackage.haskell.org/package/bound), that can help you develop a correct implementation of binding.
 
@@ -19,7 +19,7 @@ So why do I care about this topic? First, I've wanted to have deeper understandi
 
 *Reference files:* [Subst](src/Subst.hs) and [Simple](src/Simple.hs)
 
-The first part is a tutorial overview of de Bruijn indices and substitution, culminating in an traditionally typed implmentation of the simply-typed lambda calculus (STLC). If you are new to using de Bruijn indices, this part will walk you through the details and provide a general purpose recipe for a Haskell implementation of binding.  Even if you are not new to de Bruijn indices, you should take a look at this implementation because there are *different* versions of substitution with this representation.
+The first part is a tutorial overview of de Bruijn indices and substitution, culminating in an traditionally typed implementation of the simply-typed lambda calculus (STLC). If you are new to using de Bruijn indices, this part will walk you through the details and provide a general purpose recipe for a Haskell implementation of binding.  Even if you are not new to de Bruijn indices, you should take a look at this implementation because there are *different* versions of substitution with this representation.
 
 - [Part II: Adding strong types to STLC](debruijn2.md)
 
@@ -51,6 +51,5 @@ Finally, we make a well-typed AST for System F, using both the untyped (for Syst
 
   - [TypeCheck](src/TypeCheck.hs): A type checker that translates an untyped AST to a typed AST
   - [CPS](src/Cps.hs): CPS-conversion algorithm for strongly-typed AST
-
 
 - [Bibliography](bibliography.md): Sources and related work

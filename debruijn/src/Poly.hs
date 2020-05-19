@@ -45,7 +45,6 @@ instance SubstC Exp where
    subst s (LamE ty e)  = LamE ty (subst (lift s) e)
    subst s (AppE e1 e2) = AppE (subst s e1) (subst s e2)
    subst s (TyLam e)    = TyLam (subst (fmap (substTy incSub) s) e)  
-            --- note, this line is hard to motivate
    subst s (TyApp e t)  = TyApp (subst s e) t
 
 substTy :: Sub Ty -> Exp -> Exp
@@ -56,15 +55,9 @@ substTy s (AppE e1 e2) = AppE (substTy s e1) (substTy s e2)
 substTy s (TyLam e)    = TyLam (substTy (lift s) e)
 substTy s (TyApp e t)  = TyApp (substTy s e) (subst s t)
 
-{-
-liftTySub :: Sub Exp -> Sub Exp 
-liftTySub = fmap (substTy incSub)
--}
-{-
-substTySub s (Inc i)     = Inc i
-substTySub s (e   :< s1) = substTy s e :< substTySub s s1
-substTySub s (s1 :<> s2) = substTySub s s1 :<> substTySub s s2
--}
+
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
 
 -- | is an expression a value?
 value :: Exp -> Bool
@@ -101,7 +94,7 @@ reduce (TyApp (TyLam e) t)   = substTy (singleSub t) (reduce e)
 reduce (TyApp e t) | value e = error "Type error!"
 reduce (TyApp e t) = TyApp (reduce e) t
 
-
+---------------------------------------------------------------------------------
 -- | Type checker
 typeCheck :: [Ty] -> Exp -> Maybe Ty
 typeCheck g (IntE i)    = return IntTy

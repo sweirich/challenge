@@ -6,23 +6,12 @@ import Imports
 import Subst
 import SubstProperties 
 import qualified SubstTyped as T
+
+-- We import the definition of types from the "untyped" AST so that we can
+-- later write a type checker that shares these types. (See TypeCheck.hs).
 import Poly (Ty(..),STy(..))
 
--- We want to use this substitution in types. So we ask Singletons
--- to promote this type class instance to type families.
-{-
-$(singletons [d|
-    
-    data Ty = IntTy | Ty :-> Ty | VarTy Idx | PolyTy Ty
-    
-    instance SubstC Ty where
-      var = VarTy
-      subst s IntTy       = IntTy
-      subst s (t1 :-> t2) = subst s t1 :-> subst s t2
-      subst s (VarTy x)   = applyS s x
-      subst s (PolyTy t)  = PolyTy (subst (lift s) t)
- |])
--}
+
 
 data Exp :: [Ty] -> Ty -> Type where
 

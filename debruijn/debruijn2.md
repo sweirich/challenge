@@ -8,21 +8,23 @@ The AST for expressions that we developed in the last part is not type-indexed. 
 
 We will also add type parameters to the substitution operation (and reified substitutions) to make sure that as we work with well-typed terms, substitutions stay well-typed.
 
-Note that we won't change the actual code in either the Subst or Simple modules. The implementation of substitution will be exactly the same as before. All of the action will be in the types. 
+Note that we won't change the actual code in either the Subst or Simple modules. The implementation of substitution will be exactly the same as before. All of the action will be in the types.
 
-
-In other words, our goal will be to fill in the '???' in the types below to make the types more informative in the Subst module (which gives us a general purpose infrastructure for substiution):
+In otherwords, our goal will be to fill in the `???` in the types below to make the types more informative in the [Subst](src/Subst.hs) module (which gives us a general purpose infrastructure for substiution):
 
 ```haskell
+-- What context are we indexing into? What do we find?
 data Idx ??? where
   Z :: Idx ???
   S :: Idx ??? -> Idx ???
 
+-- How does substitution change the context?
 data Sub a ??? where
-   Inc   :: ??? -> Sub a ???                         --  increment by n (shift)
-   (:<)  :: a ??? -> Sub a ??? -> Sub a ???          --  extend a substitution (like cons)
+   Inc   :: ??? -> Sub a ???
+   (:<)  :: a ??? -> Sub a ??? -> Sub a ???
    (:<>) :: Sub a ??? -> Sub a ??? -> Sub a ???
 
+-- What type of term do we get when we look up an `Idx` in the substitution? 
 applyS :: SubctC a => Sub a ??? -> Idx ??? -> a ???
 applyS (Inc n)       x  = var (add n x)
 applyS (ty :< s)     Z  = ty
@@ -33,11 +35,12 @@ class SubstC a where
    var   :: Idx ??? -> a ???
    subst :: Sub a ??? -> a ??? -> ???
 
+-- How does lift modify the substitution?
 lift :: SubstC a => Sub a ??? -> Sub a ???
 lift s = var Z :< (s :<> Inc 1)
 ```
 
-And to continue with our madlibs in the Simple module, constraining the implementation to be for the simply typed lambda calculus.
+And to continue with our madlibs in the [Simple](src/Simple.hs) module, constraining the implementation to be for the simply typed lambda calculus.
 
 ```haskell
 data Exp ??? where
@@ -55,6 +58,7 @@ data Exp ??? where
         -> Exp ???         -- argument
         -> Exp ???
 
+-- Same definition as in `Simple`
 instance SubstC Exp where
    var = VarE
 
@@ -62,8 +66,6 @@ instance SubstC Exp where
    subst s (VarE x)     = applyS s x
    subst s (LamE ty e)  = LamE ty (subst (lift s) e)
    subst s (AppE e1 e2) = AppE (subst s e1) (subst s e2)
-
-
 ```
 
 ## Strongly-typed AST
@@ -75,16 +77,18 @@ data Ty = IntTy | Ty :-> Ty
     deriving (Eq,Show)
 ```
 
-The `Exp` GADT below has two type arguments: the first, `g` is a typing context that provides the types of the free variables in the expression.
+The `Exp` GADT below has two type parameters: 
 
-With de Brujn indices, this context is a *type-level* list of types where the *i-th* type in the list is the type of the *i-th* free variable.
+1. The first (of kind `[Ty]`) is a typing context that provides the types of the free variables in the expression.
 
-The second argument, `t`, is the type of the entire expressions.
+   With de Brujn indices, this context can be represented using a *type-level* list of types where the *i-th* type in the list is the type of the *i-th* free variable.
 
-In both cases, we are using *datatype promotion*, i.e. the `DataKinds` GHC extension, to use data constructors (like `IntTy`, `:->` and `:`) in the parameters of datatypes.
+2. The second (of kind `Ty`) is the type of the entire expression.
+
+In both cases, we are using *datatype promotion*, i.e. the `DataKinds` GHC extension, to use data constructors (like `IntTy`, `:->` and `:`) in the arguments of datatypes.
 
 ```haskell
-data Exp (g :: [Ty]) (t::Ty) :: Type where
+data Exp :: [Ty] -> Ty -> Type where
 
  IntE   :: Int -> Exp g IntTy
  -- ^ literal ints, valid in any context
@@ -193,38 +197,38 @@ add (IS xs) i = S (add xs i)
 
 That is it! We didn't really need to change any code. We only need to add (a lot of) types.
 
-NOTES:
+*ADDITIONAL NOTES:*
 
 1. This definition of index is perfect for safely accessing a heterogeneous list: *i.e.* a list where each element may have a different type.
 
-```haskell
-data HList (g :: [k]) where
-  HNil  :: HList '[]
-  HCons :: t -> HList g -> HList (t:g)
+    ```haskell
+    data HList (g :: [k]) where
+      HNil  :: HList '[]
+      HCons :: t -> HList g -> HList (t:g)
 
-indx :: HList g -> Idx g t -> t
-indx g Z = case g of
-   (HCons x xs) -> x
-indx g (S n) = case g of
-   (HCons x xs) -> indx xs n
-```
+    indx :: HList g -> Idx g t -> t
+    indx g Z = case g of
+       (HCons x xs) -> x
+    indx g (S n) = case g of
+       (HCons x xs) -> indx xs n
+    ```
+  
+    Note that we index into this heterogeneous list, we never need to include a case for `HNil`.   The   type indices guarantee that the index will be found in the list (and has the appropriate   type).
 
-Note that we index into this heterogeneous list, we never need to include a case for `HNil`. The type indices guarantee that the index will be found in the list (and has the appropriate type).
+2. In this example we could skip the definition of the `Ty` datatype by using Haskell types to represent STLC types. But we will need this data structure when we go to System F, so we introduce it here.
 
-- In this example we could skip the definition of the `Ty` datatype by using Haskell types to represent STLC types. But we will need this data structure when we go to System F, so we introduce it here.
+3. Our (parallel) substitution operation subsumes all of the context manipulation operations that we expect from the lambda calculus, including substituting for a free variable, weakening (i.e. introducing a new variable into the context somewhere), and exchange.
 
-- Our (parallel) substitution operation subsumes all of the context manipulation operations that we expect from the lambda calculus, including substituting for a free variable, weakening (i.e. introducing a new variable into the context somewhere), and exchange.
+   For example, weakening is just the increment-by-one substitution.
 
-For example, weakening is just the increment-by-one substitution.
+   ```haskell
+   incSub :: forall t a g. Sub a g (t:g)
+   incSub = Inc (IS IZ)
+   ```
 
-```haskell
-incSub :: forall t a g. Sub a g (t:g)
-incSub = Inc (IS IZ)
-```
+   And exchange swaps the variables at positions 0 and 1.
 
-And exchange swaps the variables at positions 0 and 1.
-
-```haskell
-exchange:: forall t1 t2 a g. Sub a (t1:t2:g) (t2:t1:g)
-exchange = var (S Z) :< var Z :< Inc (IS (IS IZ))
-```
+   ```haskell
+   exchange:: forall t1 t2 a g. Sub a (t1:t2:g) (t2:t1:g)
+   exchange = var (S Z) :< var Z :< Inc (IS (IS IZ))
+   ```

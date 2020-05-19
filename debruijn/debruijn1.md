@@ -1,7 +1,7 @@
 # Part I: A tutorial on substitution with de Bruijn indices
 
-*Reference files:* [Subst](src/Subst.lhs) and 
-   [Simple](src/Simple.lhs)
+*Reference files:* [Subst](src/Subst.hs) and 
+   [Simple](src/Simple.hs)
 
 ## Representing binding with de Bruijn indices
 
@@ -131,7 +131,7 @@ applyS (ty :<| s)   (S x) = applyS s x
 applyS (s1 :<> s2)     x  = subst s2 (applyS s1 x)
 ```
 
-The advantage of the defunctionalized version is that (1) it is easier for us to see what is going on when we work with datatypes than with functions and (2) if we wanted to we could optimize this representation before applying it to an expression. For example `Inc k <> Inc l` is equal to `Inc (k + l)`. And if we ever have `subst s1 (subst s2 e)` we can fuse the two traversals together into `subst (s1 <> s2) e`.
+The advantage of the defunctionalized version is that (1) it is easier for us to see what is going on when we work with datatypes than with functions and (2) if we wanted to we could optimize this representation before applying it to an expression. For example `Inc k <> Inc l` is equal to `Inc (k + l)`. And if we ever have `subst s1 (subst s2 e)` we can fuse the two traversals together into `subst (s1 :<> s2) e`. (See the module [SubstTypedOpt](src/SubstTypedOpt.hs) for more details.
 
 ### Generic substitutions
 

@@ -15,13 +15,13 @@ So why do I care about this topic? First, I've wanted to have deeper understandi
 
 ## Table of Contents
 
-- [Part I](debruijn1.md): Representing binding and substitution using de Bruijn indices
+- [Part I: Representing binding and substitution using de Bruijn indices](debruijn1.md)
 
-*Reference files:* [Subst](src/Subst.lhs) and [Simple](src/Simple.lhs)
+*Reference files:* [Subst](src/Subst.hs) and [Simple](src/Simple.hs)
 
 The first part is a tutorial overview of de Bruijn indices and substitution, culminating in an traditionally typed implmentation of the simply-typed lambda calculus (STLC). If you are new to using de Bruijn indices, this part will walk you through the details and provide a general purpose recipe for a Haskell implementation of binding.  Even if you are not new to de Bruijn indices, you should take a look at this implementation because there are *different* versions of substitution with this representation.
 
-- [Part II](debruijn2.md): Adding strong types to STLC
+- [Part II: Adding strong types to STLC](debruijn2.md)
 
 *Reference files:* [SubstTyped](src/SubstTyped.hs) and [SimpleTyped](src/SimpleTyped.hs).
 
@@ -35,13 +35,13 @@ Next, we show how to add type indices to the ASTs developed in the previous sect
 
 Simple definitions of substitution for de Bruijn indices can be woefully inefficient. In this file we show how to rectify that by the introduction of delayed substitutions at binders. This optimization can even be hidden behind an abstract type for binders. Furthermore, the type indices developed in Part II show that the optimization is still type preserving.
 
-- [Part III](debruijn3.md): Untyped ASTs for System F
+- [Part III: Untyped ASTs for System F](debruijn3.md)
 
 *Reference file:* [Poly](src/Poly.hs).
 
 Using the substitution infrastructure developed in Part I, we extend our implementation of STLC to System F.
 
-- [Part IV](debruijn4.md): Strongly-typed AST for System F
+- [Part IV: Strongly-typed AST for System F](debruijn4.md)
 
 *Reference file:* [PolyTyped](src/PolyTyped.hs) and [SubstProperties](src/SubstProperties.hs).
 

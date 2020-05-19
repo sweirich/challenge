@@ -37,8 +37,6 @@ data Exp :: Type where
         -> Ty       -- type argument
         -> Exp
 
-
-
 instance SubstC Exp where
    var = VarE
 
@@ -64,7 +62,7 @@ liftTySub = fmap (substTy incSub)
 -}
 {-
 substTySub s (Inc i)     = Inc i
-substTySub s (e   :> s1) = substTy s e :> substTySub s s1
+substTySub s (e   :< s1) = substTy s e :< substTySub s s1
 substTySub s (s1 :<> s2) = substTySub s s1 :<> substTySub s s2
 -}
 

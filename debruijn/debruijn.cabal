@@ -17,15 +17,18 @@ cabal-version:       >=1.10
 
 library
   exposed-modules:     TypeCheck
-  other-modules:       Imports,
+  other-modules:       HList,
+                       Imports,
                        Nat,
                        Subst,
                        SubstScoped,
                        SubstProperties,
                        SubstTyped,
+                       SubstTypedOpt,
                        Simple,
                        SimpleScoped,
                        SimpleTyped,
+                       SimpleTypedOpt,
                        Poly,
                        PolyTyped,
                        Cps

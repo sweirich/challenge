@@ -67,19 +67,19 @@ axiom2 s = unsafeCoerce Refl
 instance Semigroup (Sub a) where
   (<>)    = (:<>)
 instance Monoid (Sub a) where
-   mempty = idSub
+   mempty = nil
 
 prop_Assoc :: (Eq a, SubstC a) => Sub a -> Sub a -> Sub a -> Idx -> Bool
 prop_Assoc s1 s2 s3 x = applyS ((s1 <> s2) <> s3) x == applyS (s1 <> (s2 <> s3)) x
 
 prop_IdL :: (Eq a, SubstC a) => Sub a -> Idx -> Bool
-prop_IdL s x = applyS (s <> idSub) x == applyS s x
+prop_IdL s x = applyS (s <> nil) x == applyS s x
 
 prop_IdR :: (Eq a, SubstC a) => Sub a -> Idx -> Bool
-prop_IdR s x = applyS (idSub <> s) x == applyS s x
+prop_IdR s x = applyS (nil <> s) x == applyS s x
 
 prop_Id :: (Eq a, SubstC a) => a -> Bool
-prop_Id x = subst idSub x == x 
+prop_Id x = subst nil x == x 
 
 prop_Comp :: (Eq a, SubstC a) => Sub a -> Sub a -> a -> Bool
 prop_Comp s1 s2 x = subst s2 (subst s1 x) == subst (s1 <> s2) x
@@ -94,11 +94,11 @@ instance Arbitrary a => Arbitrary (Sub a) where
      let m' = m `div` 2 in
      frequency
      [(1, base),
-      (1, (:>)    <$> arbitrary <*> gt m'), 
+      (1, (:<)    <$> arbitrary <*> gt m'), 
       (1, (:<>)   <$> gt m'     <*> gt m')]
  
  shrink (Inc n) = [Inc n' | n' <- shrink n]
- shrink (t :> s)   = s : [t' :> s' | t' <- shrink t, s' <- shrink s]
+ shrink (t :< s)   = s : [t' :< s' | t' <- shrink t, s' <- shrink s]
  shrink (s1 :<> s2) = s1 : s2 :
    [s1' :<> s2 | s1' <- shrink s1, s2' <- shrink s2]                       
 

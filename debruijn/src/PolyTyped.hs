@@ -73,7 +73,7 @@ substTy_Sub :: forall s g g'. Sing s -> T.Sub Exp g g' -> T.Sub Exp (SubstList s
 --substTy_Sub s T.IdS         = T.IdS
 substTy_Sub s (T.Inc (x :: T.IncBy g1)) 
   | Refl <- axiom_map1 @(SubstSym1 s) @g1 @g = T.Inc (T.mapInc @(SubstSym1 s)  x) 
-substTy_Sub s (e T.:> s1)   = substTy s e T.:> substTy_Sub s s1
+substTy_Sub s (e T.:< s1)   = substTy s e T.:< substTy_Sub s s1
 substTy_Sub s (s1 T.:<> s2) = substTy_Sub s s1 T.:<> substTy_Sub s s2
 
 

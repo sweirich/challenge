@@ -47,14 +47,14 @@ index v (FS n) = case v of
 data Sub (a :: Nat -> Type) (n :: Nat) (m :: Nat) where
 --    IdS   :: Sub a n n                             --  identity subst
     Inc   :: Sing m -> Sub a n (m + n)               --  increment by 1 (shift)                
-    (:>)  :: a m -> Sub a n m -> Sub a (S n) m       --  extend a substitution (like cons)
+    (:<)  :: a m -> Sub a n m -> Sub a (S n) m       --  extend a substitution (like cons)
     (:<>) :: Sub a m n -> Sub a n p -> Sub a m p     --  compose substitutions
 
-infixr :>     -- like usual cons operator (:)
+infixr :<     -- like usual cons operator (:)
 infixr :<>    -- like usual composition  (.)
 
-idSub :: Sub a n n 
-idSub = Inc SZ
+nil :: Sub a n n 
+nil = Inc SZ
 
 incSub :: Sub a n (S n)
 incSub = Inc (SS SZ)
@@ -73,15 +73,15 @@ add (SS m) x = FS (add m x)
 applyS :: SubstC a => Sub a n m -> Idx n -> a m
 --applyS IdS            x  = var x
 applyS (Inc m)        x  = var (add m x)
-applyS (ty :> s)     FZ  = ty
-applyS (ty :> s)  (FS x) = applyS s x
+applyS (ty :< s)     FZ  = ty
+applyS (ty :< s)  (FS x) = applyS s x
 applyS (s1 :<> s2)    x  = subst s2 (applyS s1 x)
 
 singleSub :: a n -> Sub a (S n) n
-singleSub t = t :> idSub
+singleSub t = t :< nil
 
 lift :: SubstC a => Sub a n m -> Sub a (S n) (S m)
-lift s = var FZ :> (s :<> incSub)
+lift s = var FZ :< (s :<> incSub)
 
 
 

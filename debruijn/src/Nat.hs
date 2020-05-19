@@ -24,8 +24,8 @@ module Nat (
   indx, Indx, sIndx, IndxSym0,
 
   prop_Length_take,
-  ax_Length_Take,
-  proof_Length_Pred
+  ax_Length_Take
+  --proof_Length_Pred
 
 ) where
 
@@ -77,6 +77,8 @@ $(singletons [d|
     
     |])
 
+
+
 type a + b = Plus a b
 type a - b = Minus a b
 
@@ -101,7 +103,7 @@ instance Num Nat where
   abs x    = x
   signum Z = 0
   signum x = 1
-
+ 
 instance Enum Nat where
   toEnum :: Int -> Nat
   toEnum = fromInteger . toInteger
@@ -121,6 +123,8 @@ than the length of the list, we'll get back a result of length k.
     
 -}
 
+{-
+
 proof_Length_Take :: forall k xs. ((k <= Length xs) ~ True) =>
   Sing k -> Sing xs -> Length (Take k xs) :~: k
 proof_Length_Take SZ     SNil = Refl
@@ -130,6 +134,7 @@ proof_Length_Take (SS n) (SCons x ys)
   , Refl <- proof_Length_Take n ys
   = Refl
 
+-}
 {-
 
 However, the above proof is terrible for two reasons. First, we need to have

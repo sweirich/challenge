@@ -64,7 +64,7 @@ module Imports(
   STraversable(sTraverse, sSequenceA, sMapM, sSequence),
 
   -- ** Miscellaneous functions
-  Id, sId, Const, sConst, type (.), (%.), type ($), (%$), type ($!), (%$!),
+  Id, sId, Const, sConst, (%.), type ($), (%$), type ($!), (%$!),
   Flip, sFlip, AsTypeOf, sAsTypeOf,
   Seq, sSeq,
 

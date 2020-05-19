@@ -1,30 +1,47 @@
--- Typed version with a "smart constructor" for composition
-module SubstTypedOpt where
+-- | Typed version of the de Bruijn substiution infrastructure
+-- This version makes two optimizations:
+--   1. It suspends substiutions at binders (hidden behind a new abstract type)
+--   2. When two subs meet at binder, it combines them with a "smart constructor" for composition
+module SubstTypedOpt(
+   -- * -- Abstract type for binding locations
+   Bind, bind, unbind, instantiate, substBind,
+   -- * -- Substitution class & constructors
+   Idx(..), Sub(..), IncBy(..), SubstC(..), 
+   nil, incSub, single, comp, 
+   applyS, mapIdx, mapInc, addBy, singIndx
+ ) where
 
 import qualified Nat (Nat(..),SNat(..),Length,length,LengthSym0)
 import Imports
 import Unsafe.Coerce(unsafeCoerce)
 
+-- Binding type ---------
+
 -- morally "a (t1:g) t2"
--- but may have a hidden suspended substitution
+-- but may also contain a hidden suspended substitution
 data Bind a t1 g t2 = forall g'. Bind (Sub a g' (t1:g)) (a g' t2)
 
+-- introdue a binder
 bind :: SubstC a => a (t1:g) t2 -> Bind a t1 g t2
 bind = Bind (Inc IZ)
 {-# INLINABLE bind #-}
 
+-- expose the body of the binder
 unbind :: SubstC a => Bind a t1 g t2 -> a (t1:g) t2
 unbind (Bind s a) = subst s a
 {-# INLINABLE unbind #-}
 
+-- replace the variable bound at the binder
 instantiate :: SubstC a => Bind a t1 g t2 -> a g t1 -> a g t2
 instantiate (Bind s a) b = subst (comp s (single b)) a
 {-# INLINABLE instantiate #-}
 
+-- apply a substitution to a binder
 substBind :: SubstC a => Sub a g1 g2 -> Bind a t1 g1 t2 -> Bind a t1 g2 t2
 substBind s2 (Bind s1 e) = Bind (comp s1 (lift s2)) e
 {-# INLINABLE substBind #-}
 
+-- Substitution infrastructure ----------------
 
 -- | Variable reference in a context
 -- This type is isomorphic to the natural numbers
@@ -56,7 +73,6 @@ singIndx g Z = case g of
 singIndx g (S n) = case g of 
    (SCons _ xs) -> singIndx xs n
 
-
 -- For increment, we need a proxy that gives us the type of the extended context, 
 -- but is computationally a natural number
 data IncBy (g :: [k]) where
@@ -64,21 +80,26 @@ data IncBy (g :: [k]) where
    IS :: IncBy n -> IncBy (t:n)
 
 data Sub (a :: ([k] -> k -> Type)) (g :: [k]) (g'::[k]) where
-   Inc   :: IncBy g1 -> Sub a g (g1 ++ g)                 --  increment by n (shift)                
+   Inc   :: IncBy g1 -> Sub a g (g1 ++ g)                 --  weaken the context (shifting all variables over)                
    (:<)  :: a g' t -> Sub a g g' -> Sub a (t:g) g'        --  extend a substitution (like cons)
    (:<>) :: Sub a g1 g2 -> Sub a g2 g3 -> Sub a g1 g3 
 
---nil :: Sub a g g 
+-- | Identity substitution
+nil :: Sub a g g 
 nil = Inc IZ
 
---incSub :: forall t a g. Sub a g (t:g)
+-- | Weaken
+incSub :: forall t a g. Sub a g (t:g)
 incSub = Inc (IS IZ)
 
+-- | single substitution for index 0
+single :: a g t -> Sub a (t:g) g
 single t = t :< nil
 
 infixr :<    -- like usual cons operator (:)
 infixr :<>   -- like usual composition  (.)
 
+-- | weaken an index
 add :: IncBy g1 -> Idx g t -> Idx (g1 ++ g) t
 add IZ i = i
 add (IS xs) i = S (add xs i)

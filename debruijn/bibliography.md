@@ -10,23 +10,27 @@ This version also does not defunctionalize substitutions (as we do here), but in
       type Sub E g g' = forall t, Idx g t -> E g' t
 ```
 
-- Pottier. *Revisiting the CPS Transformation and its Implementation. Draft paper, 2017. 
-  http://gallium.inria.fr/~fpottier/publis/fpottier-cps.pdf
+- Pottier. *[Revisiting the CPS Transformation and its Implementation](http://gallium.inria.fr/~fpottier/publis/fpottier-cps.pdf). Draft paper, 2017.*
+  
 
-Uses the [Autosubst](https://www.ps.uni-saarland.de/Publications/documents/SchaeferEtAl_2015_Autosubst_-Reasoning.pdf) to represent variable binding in a simply-typed language and then proves CPS transformation correct. Doesn't use a strongly-typed term representation. Notes that this implementation is inefficient and replaces it with de Bruijn level based representation instead.
+Uses the [Autosubst](https://www.ps.uni-saarland.de/Publications/documents/SchaeferEtAl_2015_Autosubst_-Reasoning.pdf) library to represent variable binding in a simply-typed language and then proves CPS transformation correct. Doesn't use a strongly-typed term representation. Notes that this implementation is inefficient and replaces it with de Bruijn level based representation instead.
 
-# NOTES
-ß
+- Louis-Julien Guillemette, Stefan Monnier. *[A type-preserving compiler in Haskell](https://dl.acm.org/doi/10.1145/1411203.1411218).* ICFP 2008: 75-86
+
+This impressive paper from 2008 represents several stages of a System F compiler in Haskell, using GADTs, type families and functional dependencies. Polymorphic type variables are represented using de Bruijn indices, where as term variables are sometimes expressed using HOAS (for CPS conversion) and sometimes expressed using de Bruijn indices (for closure conversion, hoisting).
+
+## NOTES
+
 However, most places use functions to represent renamings and substitutions.
 
 In this case, I'd like a concrete data structure for substitutions, so I've
 defunctionalized the implementation. Note that the definition of composeSub
-cannot be part of the data structure because its application requires the 
+cannot be part of the data structure because its application requires the
 definition of subst.
 
-Furthermore, I need to be able to implement n-ary substitutions. 
+Furthermore, I need to be able to implement n-ary substitutions.
 
-So the challenge is to prove that my definition of composeSub is actually 
+So the challenge is to prove that my definition of composeSub is actually
 substitution composition. See the last lemma in the file.
 
 [Maybe useful reference](https://dl.acm.org/citation.cfm?id=2693163)

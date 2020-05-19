@@ -73,7 +73,7 @@ eval :: Exp '[] t -> Exp '[] t
 eval (AppE e1 e2) = 
    case unLam (eval e1) of
       Left (IsFalse k) -> k
-      Right e11        -> subst (singleSub e2) e11
+      Right e11        -> subst (single e2) e11
 eval (IntE x)     = IntE x
 eval (VarE v)     = case v of {}
 eval (LamE ty e)  = LamE ty e

@@ -52,6 +52,7 @@
 # - ignore: {name: Use const, within: SpecialModule} # Only within certain modules
 
 ignore: {name: Use camelCase}
+ignore: {name: Reduce duplication}
 
 # Define some custom infix operators
 # - fixity: infixr 3 ~^#^~

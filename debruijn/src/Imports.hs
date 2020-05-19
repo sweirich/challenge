@@ -1,4 +1,3 @@
-{-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -fwarn-incomplete-patterns -Wno-redundant-constraints #-}
 
 module Imports(
@@ -48,7 +47,7 @@ module Imports(
   SApplicative(sPure, (%<*>), (%*>), (%<*)),
   PMonad(type (>>=), type (>>), Return),
   SMonad((%>>=), (%>>), sReturn),
-  PMonadFail(Fail), SMonadFail(sFail),
+  -- PMonadFail(Fail), SMonadFail(sFail),
 
   MapM_, sMapM_,
   Sequence_, sSequence_,
@@ -63,7 +62,8 @@ module Imports(
   STraversable(sTraverse, sSequenceA, sMapM, sSequence),
 
   -- ** Miscellaneous functions
-  Id, sId, Const, sConst, type (.), (%.), type ($), (%$), type ($!), (%$!),
+  Id, sId, Const, sConst, -- type (.),
+    (%.), type ($), (%$), type ($!), (%$!),
   Flip, sFlip, AsTypeOf, sAsTypeOf,
   Seq, sSeq,
 

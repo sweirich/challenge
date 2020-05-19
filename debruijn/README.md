@@ -27,9 +27,7 @@ The first part is a tutorial overview of de Bruijn indices and substitution, cul
 
 Next, we show how to add type indices to the ASTs developed in the previous section to constrain the representation to only well-typed terms of STLC. None of the code changes in this part, just the types.
 
-- Part IIa: Optimized de Bruijn representations
-
-*Optional part, may be skipped*
+- Part IIa: Optimized de Bruijn representation  (*Optional part, may be skipped*)
 
 *Reference files:* [SubstTypedOpt](src/SubstTypedOpt.hs) and [SimpleTypedOpt](src/SimpleTypedOpt.hs).
 
@@ -47,9 +45,16 @@ Using the substitution infrastructure developed in Part I, we extend our impleme
 
 Finally, we make a well-typed AST for System F, using both the untyped (for System F types) and typed (for System F terms) substitution infrastructures.
 
+- Part IVa: Optimized de Bruijn representation
+
+*Reference file:* [PolyTypedOpt](src/PolyTypedOpt.hs).
+
+And, it is straightforward to convert the well-typed version from part IV to use the optimized substitution library.
+
 - Additional Examples:
 
   - [TypeCheck](src/TypeCheck.hs): A type checker that translates an untyped AST to a typed AST
   - [CPS](src/Cps.hs): CPS-conversion algorithm for strongly-typed AST
+  - [SubstScoped](src/SubstScoped.hs) and [SimpleScoped](src/SimpleScoped): Just keep track of scopes, not types
 
 - [Bibliography](bibliography.md): Sources and related work

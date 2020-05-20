@@ -53,6 +53,7 @@
 
 ignore: {name: Use camelCase}
 ignore: {name: Reduce duplication}
+ignore: {name: Use map once}
 
 # Define some custom infix operators
 # - fixity: infixr 3 ~^#^~

@@ -29,15 +29,27 @@ axiom_map1 = unsafeCoerce Refl
 
 -------------------------------------------------------------------
 
+--substList :: SubstC a => Sub a -> [a] -> [a]
+    --substList s = map (subst s)
+ 
+    --incList :: SubstC a => [a] -> [a]
+    --incList = substList incSub
+ 
+    --liftList :: SubstC a => Sub a -> [a] -> [a]
+    --liftList s = substList (lift s)
+
 prop1 :: Sub Exp -> [Exp] -> Bool
-prop1 s g = liftList s (incList g) == incList (substList s g)
+prop1 s g = map (subst (lift s)) (map (subst incSub) g) == 
+            map (subst incSub) (map (subst s) g)
 
 axiom1 :: forall g s. Sing s ->
-           LiftList s (IncList g) :~: IncList (SubstList s g)
+           Map (SubstSym1 (LiftSym1 s)) (Map (SubstSym1 IncSub) g) :~: 
+           Map (SubstSym1 IncSub) (Map (SubstSym1 s) g)
 axiom1 s = unsafeCoerce Refl
 
 lemma1 :: forall (g :: [Exp]) s. Sing s -> Sing g ->
-           LiftList s (IncList g) :~: IncList (SubstList s g)
+           Map (SubstSym1 (LiftSym1 s)) (Map (SubstSym1 IncSub) g) :~: 
+           Map (SubstSym1 IncSub) (Map (SubstSym1 s) g)
 lemma1 s SNil = Refl
 lemma1 s (SCons x xs)
    | Refl <- lemma1 s xs,

@@ -78,7 +78,7 @@ reifyCont :: Sing t -> Cont g t -> Exp g (t :-> VoidTy)
 reifyCont t (Obj o)   = o
 reifyCont t (Meta k)  = LamE t k
 
-substTyCont :: Sing (s :: Sub Ty) -> Cont g t -> Cont (SubstList s g) (Subst s t)
+substTyCont :: Sing (s :: Sub Ty) -> Cont g t -> Cont (Map (SubstSym1 s) g) (Subst s t)
 substTyCont s (Obj o)   = Obj (substTy s o)
 substTyCont s (Meta k)  = Meta (substTy s k)
 

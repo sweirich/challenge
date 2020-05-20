@@ -50,14 +50,9 @@ $(singletons [d|
     lift :: SubstC a => Sub a -> Sub a
     lift s = var Z :< (s :<> incSub)
  
-    substList :: SubstC a => Sub a -> [a] -> [a]
-    substList s = map (subst s)
- 
+    -- increment all terms in a list 
     incList :: SubstC a => [a] -> [a]
-    incList = substList incSub
- 
-    liftList :: SubstC a => Sub a -> [a] -> [a]
-    liftList s = substList (lift s)
+    incList = map (subst incSub)
 
  |])
 

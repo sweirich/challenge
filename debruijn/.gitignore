@@ -19,3 +19,5 @@ dist-newstyle/
 *.json
 *.hspp
 .stack-work
+manyqcs/
+qs/

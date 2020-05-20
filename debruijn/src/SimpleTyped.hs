@@ -82,5 +82,5 @@ unLam (LamE t1 e11) = Right e11
 unLam (AppE e1 e2)  = case unLam e1 of
                         Left i -> Left i
                         Right _ -> error "Found a non-value"
-unLam (VarE v)      = Left (IsFalse (case v of))
+unLam (VarE v)      = Left (IsFalse (case v of {}))
 

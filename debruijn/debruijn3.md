@@ -26,9 +26,11 @@ data Exp :: Type where
         -> Exp
 ```
 
-We actually need three forms of substitution for this language: types-in-types, terms-in-terms, and types-in-terms.
+We actually need three forms of substitution for this language: types-in-types, types-in-terms, and terms-in-terms.
 
-For the first two we can construct instances of the `SubstC` type class, but for the last, we must define a new operation, `substTy`. These substitutions follow directly from the pattern shown in Part I. In particular, they all use `applyS` for variables and `lift` when going under a binder.
+The first two are generally straightforward and follow directly from the pattern shown in Part I. In particular, they traverse the argument, use `applyS` for variables, and `lift` when going under a binder.
+
+## Types-in-types
 
 ```haskell
 instance SubstC Ty where
@@ -40,6 +42,8 @@ instance SubstC Ty where
     subst s (PolyTy t)  = PolyTy (subst (lift s) t)
 ```
 
+## Types-in-terms
+
 ```haskell
 substTy :: Sub Ty -> Exp -> Exp
 substTy s (IntE x)     = IntE x
@@ -49,6 +53,8 @@ substTy s (AppE e1 e2) = AppE (substTy s e1) (substTy s e2)
 substTy s (TyLam e)    = TyLam (substTy (lift s) e)
 substTy s (TyApp e t)  = TyApp (substTy s e) (subst s t)
 ```
+
+## Terms-in-terms
 
 The only part that requires thought is the `TyLam` case of term-in-term substitution.
 
@@ -64,4 +70,4 @@ instance SubstC Exp where
    subst s (TyApp e ty) = TyApp (subst s e) ty
  ```  
 
-In this case, we are going under a binder, but it is a type-variable binder, not a term-variable binder. Because of that difference, we need to shift the type variables in the range of the term substitution, but we don't need to do anything else.
+In this case, we are going under a binder, but it is a type-variable binder, not a term-variable binder. Because of that difference, we need to shift the type variables in the range of the term substitution, but we don't need to do anything else. Conveniently, substitutions are functors, so we can use `fmap`.

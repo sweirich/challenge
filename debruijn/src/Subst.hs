@@ -20,8 +20,8 @@ $(singletons [d|
     infixr :<>    -- like usual composition  (.)
  
     -- identity substitution, leaves all variables alone
-    nil :: Sub a 
-    nil = Inc Z
+    nilSub :: Sub a 
+    nilSub = Inc Z
 
     -- increment, shifts all variable by one
     incSub :: Sub a 
@@ -30,7 +30,7 @@ $(singletons [d|
     -- singleton, replace 0 with t, leave everything
     -- else alone
     singleSub :: a -> Sub a
-    singleSub t = t :< nil
+    singleSub t = t :< nilSub
 
     -- General class for terms that support substitution
     class SubstC a where

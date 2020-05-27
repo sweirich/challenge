@@ -7,7 +7,7 @@ module SubstTypedOpt(
    Bind, bind, unbind, instantiate, substBind,
    -- * -- Substitution class & constructors
    Idx(..), Sub(..), IncBy(..), SubstC(..), 
-   nil, incSub, single, comp, 
+   nilSub, incSub, single, comp, 
    applyS, mapIdx, mapInc, addBy, singIndx
  ) where
 
@@ -85,8 +85,8 @@ data Sub (a :: ([k] -> k -> Type)) (g :: [k]) (g'::[k]) where
    (:<>) :: Sub a g1 g2 -> Sub a g2 g3 -> Sub a g1 g3 
 
 -- | Identity substitution
-nil :: Sub a g g 
-nil = Inc IZ
+nilSub :: Sub a g g 
+nilSub = Inc IZ
 
 -- | Weaken
 incSub :: forall t a g. Sub a g (t:g)
@@ -94,7 +94,7 @@ incSub = Inc (IS IZ)
 
 -- | single substitution for index 0
 single :: a g t -> Sub a (t:g) g
-single t = t :< nil
+single t = t :< nilSub
 
 infixr :<    -- like usual cons operator (:)
 infixr :<>   -- like usual composition  (.)

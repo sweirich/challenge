@@ -58,3 +58,7 @@ So why do I care about this topic? First, I've wanted to have deeper understandi
   - [SubstScoped](src/SubstScoped.hs) and [SimpleScoped](src/SimpleScoped): Just keep track of scopes, not types
 
 - [Bibliography](bibliography.md): Sources and related work
+
+# Requirements
+
+This code requires a recent version of singletons (2.6) to compile, which itself requires GHC 8.8. Earlier compilers and versions of the library will not work. For convenience, we suggest that you compile using the `stack` tool, which will automatically download and install the correct version of the compiler and library.    

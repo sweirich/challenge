@@ -1,7 +1,7 @@
 module PolyTyped where
 
 import Imports
--- Note: bug in singletons. Cannot qualify this module import.
+-- Note: due to a limitation of singletons, we cannot qualify this module import.
 import Subst
 import SubstProperties 
 import qualified SubstTyped as T
@@ -11,7 +11,7 @@ import qualified SubstTyped as T
 import Poly (Ty(..),STy(..))
 
 
-
+-- | The well-typed AST for System F
 data Exp :: [Ty] -> Ty -> Type where
 
   IntE   :: Int
@@ -58,7 +58,6 @@ substTy s (TyApp (e :: Exp g (PolyTy t1)) (t :: Sing t2))
                        = TyApp (substTy s e) (sSubst s t)
 
 substSubTy :: forall s g g'. Sing s -> T.Sub Exp g g' -> T.Sub Exp (Map (SubstSym1 s) g) (Map (SubstSym1 s) g')
---substSubTy s T.IdS         = T.IdS
 substSubTy s (T.Inc (x :: T.IncBy g1)) 
   | Refl <- axiom_map1 @(SubstSym1 s) @g1 @g = T.Inc (T.mapInc @(SubstSym1 s)  x) 
 substSubTy s (e T.:< s1)   = substTy s e T.:< substSubTy s s1

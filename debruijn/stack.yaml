@@ -1,4 +1,5 @@
-resolver: lts-15.13
+# lts-15.14 also works
+resolver: lts-15.3
 flags: {}
 extra-package-dbs: []
 extra-deps: []

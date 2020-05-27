@@ -2,6 +2,7 @@ module SubstTyped where
 
 import qualified Nat (Nat(..),SNat(..),Length,length,LengthSym0)
 import Imports
+import Unsafe.Coerce
 
 -- | Variable reference in a context
 -- This type is isomorphic to the natural numbers
@@ -46,9 +47,11 @@ data Sub (a :: ([k] -> k -> Type)) (g :: [k]) (g'::[k]) where
    (:<>) :: Sub a g1 g2 -> Sub a g2 g3 -> Sub a g1 g3 
 
 --nil :: Sub a g g 
-nil = Inc IZ
+nilSub :: forall a1 (a2 :: [a1] -> a1 -> Type) (g :: [a1]). Sub a2 g g
+nilSub = Inc IZ
 
 --incSub :: forall t a g. Sub a g (t:g)
+incSub :: forall a1 (a2 :: [a1] -> a1 -> Type) (g :: [a1]) (t :: a1). Sub a2 g (t : g)
 incSub = Inc (IS IZ)
 
 infixr :<    -- like usual cons operator (:)
@@ -86,28 +89,6 @@ mapInc (IS n) = IS (mapInc @s n)
 
 exchange :: forall t1 t2 a g. SubstC a => Sub a (t1:t2:g) (t2:t1:g)
 exchange = var (S Z) :< var Z :< Inc (IS (IS IZ))
-
-
--- A general purpose transformation of a substitution
--- This is way to weedy for the talk, but it does mean that 
--- the implementation details of sub need to leak in to PolyTyped
-{-
-class SubTrans (a :: [k] -> k -> Type) tag where
-   type Sym tag :: k ~> k 
-   fg :: forall g. Sing tag -> Sing g -> Sing (Map (Sym tag) g)
-   f :: Sing tag -> a g t -> a (Map (Sym tag) g) (Apply (Sym tag) t)
-
-mapSub :: forall tag a g g'. (SubTrans a tag) => Sing tag ->
-       Sub a g g' -> Sub a (Map (Sym tag) g) (Map (Sym tag) g')
-mapSub tag (Inc s1) 
-  | Refl <- lemma @g' @g @tag   = Inc (fg tag s1)
-mapSub tag (e :< s1)   = f tag e :< mapSub tag s1
-mapSub tag (s1 :<> s2) = mapSub tag s1 :<> mapSub tag s2
-
-lemma :: forall g g1 tag. Map (Sym tag) g1 ++ Map (Sym tag) g :~: Map (Sym tag) (g1 ++ g)
-lemma = undefined
--}
-
 
 
 

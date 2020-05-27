@@ -79,19 +79,19 @@ axiom2 s = unsafeCoerce Refl
 instance Semigroup (Sub a) where
   (<>)    = (:<>)
 instance Monoid (Sub a) where
-   mempty = nil
+   mempty = nilSub
 
 prop_Assoc :: (Eq a, SubstC a) => Sub a -> Sub a -> Sub a -> Idx -> Bool
 prop_Assoc s1 s2 s3 x = applyS ((s1 <> s2) <> s3) x == applyS (s1 <> (s2 <> s3)) x
 
 prop_IdL :: (Eq a, SubstC a) => Sub a -> Idx -> Bool
-prop_IdL s x = applyS (s <> nil) x == applyS s x
+prop_IdL s x = applyS (s <> nilSub) x == applyS s x
 
 prop_IdR :: (Eq a, SubstC a) => Sub a -> Idx -> Bool
-prop_IdR s x = applyS (nil <> s) x == applyS s x
+prop_IdR s x = applyS (nilSub <> s) x == applyS s x
 
 prop_Id :: (Eq a, SubstC a) => a -> Bool
-prop_Id x = subst nil x == x 
+prop_Id x = subst nilSub x == x 
 
 prop_Comp :: (Eq a, SubstC a) => Sub a -> Sub a -> a -> Bool
 prop_Comp s1 s2 x = subst s2 (subst s1 x) == subst (s1 <> s2) x

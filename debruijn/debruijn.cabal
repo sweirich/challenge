@@ -35,8 +35,8 @@ library
                        Nat
                        
   -- other-extensions:
-  build-depends:       base >=4.12,
-                       singletons >= 2.5.1,
+  build-depends:       base >=4.13,
+                       singletons >= 2.6,
                        QuickCheck >= 2.12
 
   hs-source-dirs:      src

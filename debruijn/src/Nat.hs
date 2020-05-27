@@ -1,39 +1,30 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -fwarn-incomplete-patterns -Wno-redundant-constraints #-}
+-- | A simple module of natural numbers (with associated singletons)
 module Nat (
   -- * Nat type, its singleton, and symbols
-  Nat(..),SNat(..),SSym0,ZSym0,
+  Nat(..),SNat(..),SSym0,ZSym0,Sing(..),
 
   -- * standard arithmetic (+),(-),(*)
   plus,Plus(..),sPlus,PlusSym0,
-  type(+),(%+),type(+@#@$),
   mul,Mul(..),sMul,MulSym0,
-  (%*),type(*@#@$),
   minus,Minus(..),sMinus,MinusSym0,
-  type(-),(%-),type(-@#@$),
 
   -- * list operations 
   length,Length(..),sLength,LengthSym0,
-  take,Take(..),sTake,TakeSym0,
-  drop,Drop(..),sDrop,DropSym0,
-
+  
   -- unsafe indexing
   (!!), type (!!), (%!!), type (!!@#@$),
 
   -- safe indexing
   indx, Indx, sIndx, IndxSym0,
 
-  prop_Length_take,
-  ax_Length_Take
-  --proof_Length_Pred
 
 ) where
 
 import Prelude hiding ((!!), take, drop, length)
-import Imports 
-
+import Imports hiding (length, Length, sLength, LengthSym0)
 import Test.QuickCheck((==>),Property,Arbitrary(..),oneof)
-import Unsafe.Coerce(unsafeCoerce)
 
 $(singletons [d|
     data Nat = Z | S Nat deriving (Eq,Ord)
@@ -54,16 +45,6 @@ $(singletons [d|
     length [] = Z
     length (_:xs) = S (length xs)
 
-    take :: Nat -> [a] -> [a]
-    take Z     xs      = []
-    take (S n) (x:xs)  = (x:take n xs)
-    take n     []      = [] 
-                            
-    drop :: Nat -> [a] -> [a]
-    drop Z xs          = xs
-    drop (S n) (_:xs)  = drop n xs
-    drop n     []      = []                           
-
     (!!)                :: [a] -> Nat -> a
     []     !! _         =  error "Data.Singletons.List.!!: index too large"
     (x:xs) !! Z         =  x
@@ -77,19 +58,6 @@ $(singletons [d|
     
     |])
 
-
-
-type a + b = Plus a b
-type a - b = Minus a b
-
-type (+@#@$) = PlusSym0
-type (-@#@$) = MinusSym0
-type (*@#@$) = MulSym0
-
-(%+) = sPlus
-(%-) = sMinus
-(%*) = sMul
-
 instance Num Nat where
   fromInteger 0 = Z
   fromInteger n | n < 0 = error "Cannot represent negative numbers"
@@ -102,7 +70,7 @@ instance Num Nat where
   negate x = error "negate: Nat cannot represent negative numbers"
   abs x    = x
   signum Z = 0
-  signum x = 1
+  signum x = 1 
  
 instance Enum Nat where
   toEnum :: Int -> Nat
@@ -116,59 +84,6 @@ natToInt (S m) = 1 + natToInt m
 
 instance Show Nat where
   show = show . natToInt 
-
-{-
-Here is a simple proof about the take operation. If the argument k is smaller
-than the length of the list, we'll get back a result of length k.
-    
--}
-
-{-
-
-proof_Length_Take :: forall k xs. ((k <= Length xs) ~ True) =>
-  Sing k -> Sing xs -> Length (Take k xs) :~: k
-proof_Length_Take SZ     SNil = Refl
-proof_Length_Take SZ     (SCons x ys) = Refl
-proof_Length_Take (SS n) (SCons x ys) 
-  | Refl <- proof_Length_Pred n ys
-  , Refl <- proof_Length_Take n ys
-  = Refl
-
--}
-{-
-
-However, the above proof is terrible for two reasons. First, we need to have
-the two singleton values around to do the proof, as it pattern matches on
-them. Second, if we ever use this proof we need to run it. And that can take
-a long time.
-
--}
-
-ax_Length_Take :: forall k xs.
-  ((k <= Length xs) ~ True) => Length (Take k xs) :~: k
-ax_Length_Take = unsafeCoerce Refl
-
-
-prop_Length_take :: Nat -> [a] -> Property
-prop_Length_take k xs =
-  k <= length xs ==> length (take k xs) == k
-
-
-
--- {
--- This example exceeds the ability of GHC's exhaustiveness checker
--- there is a warning if the last line is missing and
--- a warning if it is present
-proof_Length_Pred :: forall k x xs.
-  Sing k -> Sing xs ->
-  ((S k <= Length (x ': xs)) ~ True) => (k <= Length xs) :~: True     
-proof_Length_Pred _ = unsafeCoerce Refl
--- proof_Length_Pred SZ (SCons x xs) = Refl
--- proof_Length_Pred (SS j) (SCons x xs) = proof_Length_Pred j xs
--- proof_Length_Pred (SS j) SNil = error "impossible"
---}  
-
-
 
 instance Arbitrary Nat where
   arbitrary = oneof [ return Z, S <$> arbitrary ]

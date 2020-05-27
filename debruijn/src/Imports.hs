@@ -1,8 +1,13 @@
 {-# OPTIONS_GHC -fwarn-incomplete-patterns -Wno-redundant-constraints #-}
-
+ 
 module Imports(
   module Data.Singletons,
-
+  module Data.Singletons.Prelude,
+  module Data.Singletons.Prelude.Eq,
+  module Data.Singletons.Prelude.Enum,
+  module Data.Singletons.Prelude.Num,
+  module Data.Singletons.TH,
+{-
   -- Most of Data.Singletons.Prelude
 
   SBool(..), SList(..), SMaybe(..), SEither(..), SOrdering(..),
@@ -244,7 +249,7 @@ module Imports(
 
 
   SuppressUnusedWarnings(..),
-
+-}
   -- Data.Kind
   type Type,
   -- Data.Type.Equality
@@ -264,19 +269,8 @@ import Data.Singletons
 import Data.Singletons.Prelude.Eq
 import Data.Singletons.Prelude.Enum
 import Data.Singletons.Prelude.Num
-
 import Data.Singletons.Prelude
-   hiding (Drop,Take,Length,
-          sDrop,sTake,sLength,
-          DropSym0,DropSym1,DropSym2,
-          TakeSym0,TakeSym1,TakeSym2)
 import Data.Singletons.TH
-   hiding (Drop,Take,Length,
-          sDrop,sTake,sLength,
-          DropSym0,DropSym1,DropSym2,
-          TakeSym0,TakeSym1,TakeSym2)
-
 import Data.Kind(Type)
-
 import Data.Type.Equality
 

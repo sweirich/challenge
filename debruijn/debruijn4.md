@@ -2,23 +2,21 @@
 
 *Reference file:* [PolyTyped](src/PolyTyped.hs) and [SubstProperties](src/SubstProperties.hs)
 
-Finally, we put everything together to develop a strongly-typed AST for System F. As in [Poly](src/Poly.hs), we need to use de Bruijn indices for both term and type variables.  Our general approach is to use weakly-typed ASTs for the type-level and strongly-typed ASTs at the term level. In other words, we will keep the same structure of the expression datatype that we saw in [Part II](debruijn2.md).
+Finally, we put *everything* together to develop a strongly-typed AST for System F! As in [Poly](src/Poly.hs), we need to use de Bruijn indices for both term and type variables.  Our approach is to use weakly-typed ASTs for binding at the type-level and strongly-typed ASTs for binding at the term level. In other words, we will keep the same structure of the expression datatype that we saw in [Part II](debruijn2.md).
 
 ```haskell
      data Exp :: [Ty] -> Ty -> Type where
 ```
 
-The difference is that now our types (`Ty`) can contain free type variables, which we will need to be able to substitute for.
+The difference is that now our types (`Ty`) can contain free type variables and polymorphic binders. 
 
 This part is where we are really "dependently"-typed programming, and you might expect a little [Hasochism](https://dl.acm.org/doi/10.1145/2503778.2503786) to come into play.
 
-- Good: singletons promotion means very little duplication in code.
+Overall, the good news is that the singletons library means that there is very little duplication in the code. We (mostly) don't have to write our operations multiple times. However, because we are doing functional programming at the type-level, and because the Haskell type-level lacks anonymous functions, there are a few places where the code looks a bit strange. 
 
-- Not-so-good: There are a few places where the code looks a bit strange.
+The bad news is that Haskell is not a proof assistant. There will be a few places where we have a proof obligation that we cannot satisfy. What to do?
 
-- Sadness: We have a proof obligation that we cannot satisfy in Haskell. What to do?
-
-## Singleton types and promoted substitutions
+## Singleton types and promotion
 
 This is where singletons library really comes in. If you go back to the [Subst](src/Subst.hs) and [Poly](src/Poly.hs), you'll see that some definitions are surrounded by Template Haskell brackets and calls to the `singletons` library. These definitions are processed by the library to include additional definitions that we can use for dependently-typed programming.
 
@@ -31,7 +29,7 @@ This means that in addition to the `Ty` datatype defined in that file:
 data Ty = IntTy | Ty :-> Ty | VarTy Idx | PolyTy Ty
 ```
 
-the library also *generates* the following data type declaration (we don't have to write it)
+the library also *generates* the following data type declaration for us (we don't have to write it).
 
 ```haskell
 data STy :: Ty -> Type where

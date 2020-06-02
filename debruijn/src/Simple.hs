@@ -37,31 +37,31 @@ instance SubstC Exp where
 -------------------------------------------------------------------------
 -- * Examples of some operations defined using this representation.
 
--- | is an expression a value?
-value :: Exp -> Bool
-value (IntE x)   = True
-value (LamE t e) = True
-value _          = False
 
 -- | Small-step evaluation
 step :: Exp -> Maybe Exp
-step (IntE x)   = Nothing
-step (VarE n)   = error "Unbound Variable"
-step (LamE t e) = Nothing
-step (AppE (LamE t e1) e2)   = Just $ subst (singleSub e2) e1
-step (AppE e1 e2) | value e1 = error "Type error!"
-step (AppE e1 e2) = do e1' <- step e1
-                       return $ AppE e1' e2
+step (IntE x)     = Nothing
+step (VarE n)     = error "Unbound Variable"
+step (LamE t e)   = Nothing
+step (AppE e1 e2) = Just $ stepApp e1 e2 where
 
+   stepApp :: Exp -> Exp -> Exp 
+   stepApp (IntE x)       e2 = error "Type error"
+   stepApp (VarE n)       e2 = error "Unbound variable"
+   stepApp (LamE t e1)    e2 = subst (singleSub e2) e1
+   stepApp (AppE e1' e2') e2 = AppE (stepApp e1' e2') e2
+                       
 -- | open reduction
 reduce :: Exp -> Exp
 reduce (IntE x)   = IntE x
 reduce (VarE n)   = VarE n
 reduce (LamE t e) = LamE t (reduce e)
-reduce (AppE (LamE t e1) e2)   = subst (singleSub (reduce e2)) (reduce e1)
-reduce (AppE e1 e2) | value e1 = error "Type error!"
-reduce (AppE e1 e2) = AppE (reduce e1) (reduce e2)
+reduce (AppE (LamE t e1) e2) = subst (singleSub (reduce e2)) (reduce e1)
+reduce (AppE (IntE x) e2)    = error "type error" -- don't have to observe this type error, but we can
+reduce (AppE e1 e2)          = AppE (reduce e1) (reduce e2) where
 
+-----------------------------------------------------------------------
+  
 -- | Type checker
 typeCheck :: [Ty] -> Exp -> Maybe Ty
 typeCheck g (IntE i)    = return IntTy

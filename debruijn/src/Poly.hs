@@ -57,42 +57,49 @@ substTy s (TyApp e t)  = TyApp (substTy s e) (subst s t)
 
 
 ---------------------------------------------------------------------------------
----------------------------------------------------------------------------------
 
--- | is an expression a value?
-value :: Exp -> Bool
-value (IntE x)   = True
-value (LamE t e) = True
-value (TyLam e)  = True
-value _          = False
-
--- | Small-step evaluation
+-- | Small-step evaluation of closed terms
 step :: Exp -> Maybe Exp
-step (IntE x)   = Nothing
-step (VarE n)   = error "Unbound Variable"
-step (LamE t e) = Nothing
-step (AppE (LamE t e1) e2)   = Just $ subst (singleSub e2) e1
-step (AppE e1 e2) | value e1 = error "Type error!"
-step (AppE e1 e2) = do e1' <- step e1
-                       return $ AppE e1' e2
-step (TyLam e)  = Nothing
-step (TyApp (TyLam e) t)   = Just $ substTy (singleSub t) e
-step (TyApp e t) | value e = error "Type error!"
-step (TyApp e t) = do e' <- step e
-                      return $ TyApp e' t
+step (IntE x)     = Nothing
+step (VarE n)     = error "Unbound Variable"
+step (LamE t e)   = Nothing
+step (AppE e1 e2) = Just $ stepApp e1 e2
+step (TyLam e)    = Nothing
+step (TyApp e t)  = Just $ stepTyApp e t
+
+-- | Helper function for the AppE case. 
+stepApp :: Exp  -> Exp  -> Exp
+stepApp (IntE x)       e2 = error "Type error"
+stepApp (VarE n)       e2 = error "Unbound variable"
+stepApp (LamE t e1)    e2 = subst (singleSub e2) e1
+stepApp (AppE e1' e2') e2 = AppE (stepApp e1' e2') e2
+stepApp (TyLam e)      e2 = error "Type error"
+stepApp (TyApp e1 t1)  e2 = AppE (stepTyApp e1 t1) e2
+
+-- | Helper function for the TyApp case. 
+stepTyApp :: Exp -> Ty -> Exp 
+stepTyApp (IntE x)       e2 = error "Type error"
+stepTyApp (VarE n)       t1 = error "Unbound variable"
+stepTyApp (LamE t e1)    t1 = error "Unbound variable"
+stepTyApp (AppE e1' e2') t1 = TyApp (stepApp e1' e2') t1
+stepTyApp (TyLam e1)     t1 = substTy (singleSub t1) e1
+stepTyApp (TyApp e1 t2)  t1 = TyApp (stepTyApp e1 t2) t1
+
 
 -- | open reduction
 reduce :: Exp -> Exp
 reduce (IntE x)   = IntE x
 reduce (VarE n)   = VarE n
 reduce (LamE t e) = LamE t (reduce e)
-reduce (AppE (LamE t e1) e2)   = subst (singleSub (reduce e2)) (reduce e1)
-reduce (AppE e1 e2) | value e1 = error "Type error!"
-reduce (AppE e1 e2) = AppE (reduce e1) (reduce e2)
-reduce (TyLam e)    = TyLam (reduce e)
-reduce (TyApp (TyLam e) t)   = substTy (singleSub t) (reduce e)
-reduce (TyApp e t) | value e = error "Type error!"
-reduce (TyApp e t) = TyApp (reduce e) t
+reduce (AppE (LamE t e1)  e2) = subst (singleSub (reduce e2)) (reduce e1)
+reduce (AppE (IntE x)     e2) = error "Type error"
+reduce (AppE (TyLam e1)   e2) = error "Type error"
+reduce (AppE e1 e2)           = AppE (reduce e1) (reduce e2)
+reduce (TyLam e)              = TyLam (reduce e)
+reduce (TyApp (TyLam e)    t) = substTy (singleSub t) (reduce e)
+reduce (TyApp (IntE x)     t) = error "Type error"
+reduce (TyApp (LamE t1 e2) t) = error "Type error"
+reduce (TyApp e            t) = TyApp (reduce e) t
 
 ---------------------------------------------------------------------------------
 -- | Type checker

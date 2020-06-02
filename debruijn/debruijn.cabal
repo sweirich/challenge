@@ -15,8 +15,7 @@ cabal-version:       >=1.10
 
 
 library
-  exposed-modules:     TypeCheck
-                       Subst
+  exposed-modules:     Subst
                        SubstScoped
                        SubstProperties
                        SubstTyped
@@ -29,8 +28,9 @@ library
                        PolyTyped
                        PolyTypedOpt
                        Cps
+                       TypeCheck
 
-  other-modules:       HList
+  other-modules:       AssertEquality
                        Imports
                        Nat
                        

@@ -4,11 +4,10 @@ module Cps where
 
 import Prelude hiding ((!!),(>>),drop,take,length)
 import Test.QuickCheck hiding ((===))
-import Unsafe.Coerce
-import Debug.Trace
 
 import Imports
 import Nat
+import AssertEquality
 import Poly(Ty(..),STy(..),PolyTySym0,VarTySym0)
 import Subst
 import PolyTyped
@@ -17,6 +16,25 @@ import qualified SubstTyped as ST
 $(singletons [d|
     voidTy = PolyTy (VarTy Z)
     |])
+
+
+
+-- | Access a runtime version of the type
+-- of a (well-typed) expression
+typeOf :: Sing g -> Exp g t -> Sing t
+typeOf g (VarE v)       = ST.singIndx g v
+typeOf g (IntE x)       =
+  SIntTy
+typeOf g (LamE t1 e)    =
+  t1 :%-> typeOf (SCons t1 g) e
+typeOf g (AppE e1 e2)   =
+  case typeOf g e1 of
+    _ :%-> t2 -> t2
+typeOf g (TyLam e)    =
+  SPolyTy (typeOf (sIncList g) e)
+typeOf g (TyApp e tys)  =
+  case typeOf g e of
+    SPolyTy t1 -> sSubst (sSingleSub tys) t1
 
 ------------------------------------------------
 -- This part is the type translation. To make it work, 
@@ -184,19 +202,23 @@ cpsExp (g :: CpsCtx g g') (TyApp e1 (ty :: Sing ty)) k =
 
 cpsCommutes :: forall ty.
              CpsTy (Subst IncSub ty) :~: Subst IncSub (CpsTy ty)
-cpsCommutes = unsafeCoerce Refl
+cpsCommutes = assertEquality
 
 
+-- Justification for axiom above using quickCheck
 cps_commutes ty =
    cpsTy (subst incSub ty) == subst incSub (cpsTy ty)
 
 cpsCommutes2 :: forall ty1 ty.
              CpsTy (Subst (SingleSub ty1) ty) :~:
              Subst (SingleSub (CpsTy ty1)) (CpsTy ty)
-cpsCommutes2 = unsafeCoerce Refl
+cpsCommutes2 = assertEquality
 
+-- Justification for axiom above using QuickCheck
 cps_commutes2 tys ty =
    cpsTy (subst (singleSub tys) ty) == subst (singleSub (cpsTy tys)) (cpsTy ty)
+
+
 
 sIncCpsCtx  :: forall n g g'.
                CpsCtx g g'

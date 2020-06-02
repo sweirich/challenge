@@ -35,21 +35,24 @@ instance SubstC Exp where
 
 
 -----------------------------------------------------------------------
--- | is an expression a value?
-value :: Exp g t -> Bool
-value (IntE x)   = True
-value (LamE t e) = True
-value _          = False
 
--- | Small-step evaluation
+
+-- | Small-step evaluation of closed terms.
+-- Note that the type of this function shows that it is a "proof" of preservation
 step :: Exp '[] t -> Maybe (Exp '[] t)
-step (IntE x)   = Nothing
-step (VarE n)   = case n of {}
-step (LamE t e) = Nothing
-step (AppE (LamE t e1) e2)   = Just $ subst (singleSub e2) e1
---step (AppE (IntE x) e2)      = error "Type error!"
-step (AppE e1 e2) = do e1' <- step e1
-                       return $ AppE e1' e2
+step (IntE x)     = Nothing
+step (VarE n)     = case n of {}
+step (LamE t e)   = Nothing
+step (AppE e1 e2) = Just $ stepApp e1 e2 where
+
+    --  Helper function for the AppE case. This function proves that we will
+    -- *always* take a step if a closed term is an application expression.
+    stepApp :: Exp '[] (t1 :-> t2) -> Exp '[] t1  -> Exp '[] t2
+    -- stepApp (IntE x)       e2 = error "Type error"
+    stepApp (VarE n)       e2 = case n of {}    
+    stepApp (LamE t e1)    e2 = subst (singleSub e2) e1
+    stepApp (AppE e1' e2') e2 = AppE (stepApp e1' e2') e2
+
 
 -- | open reduction
 reduce :: Exp g t -> Exp g t
@@ -57,30 +60,7 @@ reduce (IntE x)   = IntE x
 reduce (VarE n)   = VarE n
 reduce (LamE t e) = LamE t (reduce e)
 reduce (AppE (LamE t e1) e2)   = subst (singleSub (reduce e2)) (reduce e1)
-reduce (AppE e1 e2) | value e1 = error "Type error!"
+-- reduce (AppE (IntE x)    e2)   = error "Type error!"
 reduce (AppE e1 e2) = AppE (reduce e1) (reduce e2)
 
--- | A proof of False
-data False where
-   IsFalse :: (forall a . a) -> False
-
-eval :: Exp '[] t -> Exp '[] t
-eval (AppE e1 e2) = 
-   case unLam (eval e1) of
-      Left (IsFalse k) -> k
-      Right e11        -> subst (singleSub e2) e11
-eval (IntE x)     = IntE x
-eval (VarE v)     = case v of {}
-eval (LamE ty e)  = LamE ty e
-
--- | The only error allowed is if we don't evaluate the term
--- completely. Maybe this example would be better as a small-step
--- semantics.
-
-unLam :: Exp '[] (t1 :-> t2) -> Either False (Exp '[t1] t2)
-unLam (LamE t1 e11) = Right e11
-unLam (AppE e1 e2)  = case unLam e1 of
-                        Left i -> Left i
-                        Right _ -> error "Found a non-value"
-unLam (VarE v)      = Left (IsFalse (case v of {}))
 

@@ -80,7 +80,7 @@ stepApp (TyApp e1 t1)  e2 = AppE (stepTyApp e1 t1) e2
 stepTyApp :: Exp -> Ty -> Exp 
 stepTyApp (IntE x)       e2 = error "Type error"
 stepTyApp (VarE n)       t1 = error "Unbound variable"
-stepTyApp (LamE t e1)    t1 = error "Unbound variable"
+stepTyApp (LamE t e1)    t1 = error "Type error"
 stepTyApp (AppE e1' e2') t1 = TyApp (stepApp e1' e2') t1
 stepTyApp (TyLam e1)     t1 = substTy (singleSub t1) e1
 stepTyApp (TyApp e1 t2)  t1 = TyApp (stepTyApp e1 t2) t1

@@ -8,7 +8,7 @@ import SubstTyped
 data Ty = IntTy | Ty :-> Ty
    deriving (Eq,Show)
 
--- But expression datatype includes a context (g) and type
+-- But the type of expressions now includes a context (g) and type (t)
 data Exp :: [Ty] -> Ty -> Type where
 
  IntE   :: Int -> Exp g IntTy
@@ -24,7 +24,7 @@ data Exp :: [Ty] -> Ty -> Type where
         -> Exp g t1              -- argument
         -> Exp g t2
  
-
+-- same instance definition as before
 instance SubstC Exp where
    var = VarE
 
@@ -35,17 +35,20 @@ instance SubstC Exp where
 
 
 -----------------------------------------------------------------------
-
+-- Examples
 
 -- | Small-step evaluation of closed terms.
--- Note that the type of this function shows that it is a "proof" of preservation
+-- 
+-- Either return the next term or Nothing, if the term is already a value.
+-- Note that the type of this function shows that types are preserved during
+-- evaluation
 step :: Exp '[] t -> Maybe (Exp '[] t)
 step (IntE x)     = Nothing
 step (VarE n)     = case n of {}
 step (LamE t e)   = Nothing
 step (AppE e1 e2) = Just $ stepApp e1 e2 where
 
-    --  Helper function for the AppE case. This function proves that we will
+    -- Helper function for the AppE case. This function "proves" that we will
     -- *always* take a step if a closed term is an application expression.
     stepApp :: Exp '[] (t1 :-> t2) -> Exp '[] t1  -> Exp '[] t2
     -- stepApp (IntE x)       e2 = error "Type error"
@@ -54,7 +57,7 @@ step (AppE e1 e2) = Just $ stepApp e1 e2 where
     stepApp (AppE e1' e2') e2 = AppE (stepApp e1' e2') e2
 
 
--- | open reduction
+-- | Reduce open expressions to their normal form
 reduce :: Exp g t -> Exp g t
 reduce (IntE x)   = IntE x
 reduce (VarE n)   = VarE n

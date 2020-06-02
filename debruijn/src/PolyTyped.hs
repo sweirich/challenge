@@ -118,12 +118,4 @@ reduce (TyApp (TyLam e) (t1 :: Sing t1))
 --reduce (TyApp (LamE t1 e2) t) = error "Type error"    
 reduce (TyApp e t)           = TyApp (reduce e) t
 
-axiom3 :: forall s1 s2 g. Map (SubstSym1 s2) (Map (SubstSym1 s1) g) :~: Map (SubstSym1 (s1 <> s2)) g
-axiom3 = undefined
-
-axiom4 :: forall t s. (Inc (S Z)) <> (t :< s) :~: s
-axiom4 = undefined
-
-axiom5 :: forall g. Map (SubstSym1 (Inc Z)) g :~: g
-axiom5 = undefined
 

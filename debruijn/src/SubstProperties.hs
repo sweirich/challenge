@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
-module SubstProperties(axiom1, axiom2, axiom_map1) where
+module SubstProperties(axiom1, axiom2, axiom3, axiom4, axiom5, axiom_map1, runTests) where
 
 import AssertEquality
 import Imports
@@ -22,9 +22,6 @@ instance SubstC Exp where
   var = VarE
   subst s (VarE x)  = applyS s x
   subst s (LamE e)  = LamE (subst (lift s) e)
-
-
-
 
 -------------------------------------------------------------------
 

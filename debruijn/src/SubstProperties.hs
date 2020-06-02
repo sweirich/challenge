@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
-module SubstProperties(axiom1, axiom2, axiom3, axiom4, axiom5, axiom_map1, runTests) where
+module SubstProperties(axiom1, axiom2, axiom3, axiom4, axiom5, axiom6, axiom_map1, runTests) where
 
 import AssertEquality
 import Imports
@@ -34,8 +34,8 @@ axiom1 :: forall g s. Sing s ->
 axiom1 s = assertEquality
 
 -- We could use quickcheck to convince us, by generating a lot of test cases.
-prop1 :: Sub Exp -> [Exp] -> Bool
-prop1 s g = map (subst (lift s)) (map (subst incSub) g) == 
+prop_1 :: Sub Exp -> [Exp] -> Bool
+prop_1 s g = map (subst (lift s)) (map (subst incSub) g) == 
             map (subst incSub) (map (subst s) g)
 
 
@@ -56,31 +56,40 @@ check1 g s =
 
 -------------------------------------------------------------------
 
-prop2 :: Sub Exp -> Exp -> Exp -> Bool
-prop2 s t2 x = subst s (subst (singleSub t2) x) == subst (singleSub (subst s t2)) (subst (lift s) x)
+prop_2 :: Sub Exp -> Exp -> Exp -> Bool
+prop_2 s t2 x = subst s (subst (singleSub t2) x) == subst (singleSub (subst s t2)) (subst (lift s) x)
 
 axiom2 :: forall t1 t2 s . Sing s ->
              Subst s (Subst (SingleSub t2) t1) :~: Subst (SingleSub (Subst s t2)) (Subst (Lift s) t1)
 axiom2 s = assertEquality
 
-prop3 :: Sub Exp -> Sub Exp -> [Exp] -> Bool
-prop3 s1 s2 g = map (subst s2) (map (subst s1) g) == map (subst (s1 <> s2)) g
+prop_3 :: Sub Exp -> Sub Exp -> [Exp] -> Bool
+prop_3 s1 s2 g = map (subst s2) (map (subst s1) g) == map (subst (s1 <> s2)) g
 
-axiom3 :: forall s1 s2 g. Map (SubstSym1 s2) (Map (SubstSym1 s1) g) :~: Map (SubstSym1 (s1 <> s2)) g
+axiom3 :: forall s1 s2 g. Map (SubstSym1 s2) (Map (SubstSym1 s1) g) :~: Map (SubstSym1 (s1 :<> s2)) g
 axiom3 = assertEquality
 
-prop4 :: Exp -> Sub Exp -> Bool
-prop4 t s = Inc (S Z) <> (t :< s) == s
+prop_4 :: Exp -> Sub Exp -> [Exp] -> Bool
+prop_4 t s g = map (subst (Inc (S Z) <> (t :< s))) g == map (subst s) g
 
-axiom4 :: forall t s. (Inc (S Z)) <> (t :< s) :~: s
+axiom4 :: forall t s g. Map (SubstSym1 (Inc (S Z) :<> (t :< s))) g :~: Map (SubstSym1 s) g
 axiom4 = assertEquality
 
-prop5 :: [Exp] -> Bool
-prop5 g = map (subst (Inc Z)) g == g
+prop_5 :: [Exp] -> Bool
+prop_5 g = map (subst (Inc Z)) g == g
 
 axiom5 :: forall g. Map (SubstSym1 (Inc Z)) g :~: g
 axiom5 = assertEquality
 
+axiom6 :: forall t g . Map (SubstSym1 (t ':< 'Inc 'Z)) (Map (SubstSym1 ('Inc ('S 'Z))) g) :~: g
+axiom6
+  | Refl <- axiom3 @(Inc (S Z)) @(t :< Inc Z) @g
+  , Refl <- axiom4 @t @(Inc Z) @g
+  , Refl <- axiom5 @g
+  = Refl
+
+prop_6 :: Exp -> [Exp] -> Bool
+prop_6 t2 g = map (subst (t2 :< Inc Z)) (map (subst (Inc (S Z))) g) == g
 
 -------------------------------------------------------------------
 

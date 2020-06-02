@@ -110,9 +110,7 @@ reduce (AppE (LamE t e1) e2) = T.subst (T.singleSub (reduce e2)) (reduce e1)
 reduce (AppE e1 e2)          = AppE (reduce e1) (reduce e2)
 reduce (TyLam e)             = TyLam (reduce e)
 reduce (TyApp (TyLam e) (t1 :: Sing t1))
-    | Refl <- axiom3 @(Inc (S Z)) @(t1 :< Inc Z) @g   -- because the context is not empty
-    , Refl <- axiom4 @t1 @(Inc Z)                     -- there are some facts we need to know
-    , Refl <- axiom5 @g                                
+      | Refl <- axiom6 @t1 @g
       = substTy (sSingleSub t1) (reduce e)
 --reduce (TyApp (IntE x)     t) = error "Type error"
 --reduce (TyApp (LamE t1 e2) t) = error "Type error"    

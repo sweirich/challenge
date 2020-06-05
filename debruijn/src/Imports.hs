@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -fwarn-incomplete-patterns -Wno-redundant-constraints #-}
  
 module Imports(
+  type Π, 
   module Data.Singletons,
   module Data.Singletons.Prelude,
   module Data.Singletons.Prelude.Eq,
@@ -274,3 +275,4 @@ import Data.Singletons.TH
 import Data.Kind(Type)
 import Data.Type.Equality
 
+type Π = Sing

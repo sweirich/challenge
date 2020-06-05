@@ -16,7 +16,7 @@ data Exp :: [Ty] -> Ty -> Type where
  VarE   :: Idx g t               -- variable index
         -> Exp g t
 
- LamE   :: Sing t1               -- type of binder
+ LamE   :: Π (t1 :: Ty)          -- type of binder
         -> Exp (t1:g) t2         -- body of abstraction
         -> Exp g (t1 :-> t2)
 

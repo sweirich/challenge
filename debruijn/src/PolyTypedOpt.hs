@@ -19,7 +19,7 @@ data Exp :: [Ty] -> Ty -> Type where
   VarE   :: T.Idx g t
          -> Exp g t
 
-  LamE   :: Sing t1               -- type of binder
+  LamE   :: Π t1               -- type of binder
          -> T.Bind Exp t1 g t2    -- body of abstraction
          -> Exp g (t1 :-> t2)
 
@@ -31,7 +31,7 @@ data Exp :: [Ty] -> Ty -> Type where
          -> Exp g (PolyTy t)
 
   TyApp  :: Exp g (PolyTy t1)     -- type function
-         -> Sing t2               -- type argument
+         -> Π t2               -- type argument
          -> Exp g (Subst (SingleSub t2) t1)
 
 instance T.SubstC Exp where
@@ -45,34 +45,19 @@ instance T.SubstC Exp where
    subst s (TyApp e t)  = TyApp (T.subst s e) t
 
 substTy :: forall g s ty.
-   Sing (s :: Sub Ty) -> Exp g ty -> Exp (Map (SubstSym1 s) g) (Subst s ty)
+   Π (s :: Sub Ty) -> Exp g ty -> Exp (Map (SubstSym1 s) g) (Subst s ty)
 substTy s (IntE x)     = IntE x
 substTy s (VarE n)     = VarE $ T.mapIdx @(SubstSym1 s)  n
 substTy s (LamE t e)   = LamE (sSubst s t) (T.bind (substTy s (T.unbind e)))
 substTy s (AppE e1 e2) = AppE (substTy s e1) (substTy s e2)
 substTy s (TyLam (e :: Exp (IncList g) t))    
     | Refl <- axiom1 @g s = TyLam (substTy (sLift s) e)
-substTy s (TyApp (e :: Exp g (PolyTy t1)) (t :: Sing t2))  
+substTy s (TyApp (e :: Exp g (PolyTy t1)) (t :: STy t2))  
     | Refl <- axiom2 @t1 @t2 s
                        = TyApp (substTy s e) (sSubst s t)
 
-substSubTy :: forall s g g'. Sing s -> T.Sub Exp g g' -> T.Sub Exp (Map (SubstSym1 s) g) (Map (SubstSym1 s) g')
+substSubTy :: forall s g g'. Π s -> T.Sub Exp g g' -> T.Sub Exp (Map (SubstSym1 s) g) (Map (SubstSym1 s) g')
 substSubTy s (T.Inc (x :: T.IncBy g1)) 
   | Refl <- axiom_map1 @(SubstSym1 s) @g1 @g = T.Inc (T.mapInc @(SubstSym1 s)  x) 
 substSubTy s (e T.:< s1)   = substTy s e T.:< substSubTy s s1
 substSubTy s (s1 T.:<> s2) = substSubTy s s1 T.:<> substSubTy s s2
-
-typeOf :: Sing g -> Exp g t -> Sing t
-typeOf g (VarE v)       = T.singIndx g v
-typeOf g (IntE x)       =
-  SIntTy
-typeOf g (LamE t1 e)    =
-  t1 :%-> typeOf (SCons t1 g) (T.unbind e)
-typeOf g (AppE e1 e2)   =
-  case typeOf g e1 of
-    _ :%-> t2 -> t2
-typeOf g (TyLam e)    =
-  SPolyTy (typeOf (sIncList g) e)
-typeOf g (TyApp e tys)  =
-  case typeOf g e of
-    SPolyTy t1 -> sSubst (sSingleSub tys) t1

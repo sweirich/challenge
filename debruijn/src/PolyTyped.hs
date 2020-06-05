@@ -21,7 +21,7 @@ data Exp :: [Ty] -> Ty -> Type where
   VarE   :: T.Idx g t
          -> Exp g t
 
-  LamE   :: Sing t1               -- type of binder
+  LamE   :: Π (t1 :: Ty)          -- type of binder
          -> Exp (t1:g) t2         -- body of abstraction
          -> Exp g (t1 :-> t2)
 
@@ -33,7 +33,7 @@ data Exp :: [Ty] -> Ty -> Type where
          -> Exp g (PolyTy t)
 
   TyApp  :: Exp g (PolyTy t1)     -- type function
-         -> Sing t2               -- type argument
+         -> Π (t2 :: Ty)          -- type argument
          -> Exp g (Subst (SingleSub t2) t1)
 
 -- Although the types are much more explicit, the actual code of the instance
@@ -49,18 +49,23 @@ instance T.SubstC Exp where
    subst s (TyApp e t)  = TyApp (T.subst s e) t
 
 substTy :: forall g s ty.
-   Sing (s :: Sub Ty) -> Exp g ty -> Exp (Map (SubstSym1 s) g) (Subst s ty)
+   Π (s :: Sub Ty) -> Exp g ty -> Exp (Map (SubstSym1 s) g) (Subst s ty)
 substTy s (IntE x)     = IntE x
 substTy s (VarE n)     = VarE $ T.mapIdx @(SubstSym1 s)  n
 substTy s (LamE t e)   = LamE (sSubst s t) (substTy s e)
 substTy s (AppE e1 e2) = AppE (substTy s e1) (substTy s e2)
 substTy s (TyLam (e :: Exp (IncList g) t))    
     | Refl <- axiom1 @g s = TyLam (substTy (sLift s) e)
-substTy s (TyApp (e :: Exp g (PolyTy t1)) (t :: Sing t2))  
+substTy s (TyApp (e :: Exp g (PolyTy t1)) (t :: STy t2))  
     | Refl <- axiom2 @t1 @t2 s
                        = TyApp (substTy s e) (sSubst s t)
 
-substSubTy :: forall s g g'. Sing s -> T.Sub Exp g g' -> T.Sub Exp (Map (SubstSym1 s) g) (Map (SubstSym1 s) g')
+-- | Apply a type substitution to a term substitution
+-- The type substitution changes the contexts of the term substitution 
+substSubTy :: forall s g g'.
+              Π (s :: Sub Ty)   
+           -> T.Sub Exp g g'
+           -> T.Sub Exp (Map (SubstSym1 s) g) (Map (SubstSym1 s) g')
 substSubTy s (T.Inc (x :: T.IncBy g1)) 
   | Refl <- axiom_map1 @(SubstSym1 s) @g1 @g = T.Inc (T.mapInc @(SubstSym1 s)  x) 
 substSubTy s (e T.:< s1)   = substTy s e T.:< substSubTy s s1
@@ -91,7 +96,7 @@ stepApp (TyApp e1 t1)  e2 = AppE (stepTyApp e1 t1) e2
 
 -- | Helper function for the TyApp case. This function proves that we will
 -- *always* take a step if a closed term is a type application expression.
-stepTyApp :: Exp '[] (PolyTy t1) -> Sing t -> Exp '[] (Subst (SingleSub t) t1)
+stepTyApp :: Exp '[] (PolyTy t1) -> Π t -> Exp '[] (Subst (SingleSub t) t1)
 --stepTyApp (IntE x)       e2 = error "Type error"
 stepTyApp (VarE n)       t1 = case n of {}
 --stepTyApp (LamE t e1)    t1 = error "Type error"
@@ -109,7 +114,7 @@ reduce (AppE (LamE t e1) e2) = T.subst (T.singleSub (reduce e2)) (reduce e1)
 --reduce (AppE (TyLam e1)   e2) = error "Type error"
 reduce (AppE e1 e2)          = AppE (reduce e1) (reduce e2)
 reduce (TyLam e)             = TyLam (reduce e)
-reduce (TyApp (TyLam e) (t1 :: Sing t1))
+reduce (TyApp (TyLam e) (t1 :: STy t1))
       | Refl <- axiom6 @t1 @g
       = substTy (sSingleSub t1) (reduce e)
 --reduce (TyApp (IntE x)     t) = error "Type error"

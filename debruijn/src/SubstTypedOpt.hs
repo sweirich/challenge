@@ -4,7 +4,7 @@
 --   2. When two subs meet at binder, it combines them with a "smart constructor" for composition
 module SubstTypedOpt(
    -- * -- Abstract type for binding locations
-   Bind, bind, unbind, instantiate, substBind,
+   Bind, bind, unbind, instantiate, substBind, 
    -- * -- Substitution class & constructors
    Idx(..), Sub(..), IncBy(..), SubstDB(..), 
    nilSub, incSub, single, comp, 

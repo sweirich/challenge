@@ -70,12 +70,12 @@ add SZ x = x
 add (SS m) x = FS (add m x)
 
 --  Value of the index x in the substitution s
-applyS :: SubstC a => Sub a n m -> Idx n -> a m
---applyS IdS            x  = var x
-applyS (Inc m)        x  = var (add m x)
-applyS (ty :< s)     FZ  = ty
-applyS (ty :< s)  (FS x) = applyS s x
-applyS (s1 :<> s2)    x  = subst s2 (applyS s1 x)
+applySub :: SubstC a => Sub a n m -> Idx n -> a m
+--applySub IdS            x  = var x
+applySub (Inc m)        x  = var (add m x)
+applySub (ty :< s)     FZ  = ty
+applySub (ty :< s)  (FS x) = applySub s x
+applySub (s1 :<> s2)    x  = subst s2 (applySub s1 x)
 
 singleSub :: a n -> Sub a (S n) n
 singleSub t = t :< nilSub

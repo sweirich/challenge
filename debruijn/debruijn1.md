@@ -123,11 +123,11 @@ data Sub  =
   | Sub :<> Sub     -- compose
 
 -- apply a substitution to an index
-applyS :: Sub -> Nat -> Exp
-applyS (Inc k)         x  = VarE (k + x)
-applyS (ty :<| s)      Z  = ty
-applyS (ty :<| s)   (S x) = applyS s x
-applyS (s1 :<> s2)     x  = subst s2 (applyS s1 x)
+applySub :: Sub -> Nat -> Exp
+applySub (Inc k)         x  = VarE (k + x)
+applySub (ty :<| s)      Z  = ty
+applySub (ty :<| s)   (S x) = applySub s x
+applySub (s1 :<> s2)     x  = subst s2 (applySub s1 x)
 ```
 
 The advantage of the defunctionalized version is that (1) it is easier for us to see what is going on when we work with datatypes than with functions and (2) if we wanted to we could optimize this representation before applying it to an expression. For example `Inc k <> Inc l` is equal to `Inc (k + l)`. And if we ever have `subst s1 (subst s2 e)` we can fuse the two traversals together into `subst (s1 :<> s2) e`. (See the module [SubstTypedOpt](src/SubstTypedOpt.hs) for more details.
@@ -150,7 +150,7 @@ and then instantiate this class with each datatype that we would like to use wit
 instance SubstC Exp where
   var = Var
   subst s (IntE x)    = IntE x
-  subst s (Var i)     = applyS s i
+  subst s (Var i)     = applySub s i
   subst s (App e1 e2) = AppE (subst s e1)(subst s e2)
   subst s (Lam ty e)  = LamE ty (lift s) e
 ```

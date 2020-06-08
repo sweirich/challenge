@@ -384,17 +384,17 @@ $(singletons [d|
     -- apply a substitution to a type
     subst :: Sub -> Ty -> Ty
     subst s BaseTy        = BaseTy
-    subst s (VarTy x)     = applyS s x
+    subst s (VarTy x)     = applySub s x
     subst s (FnTy a r)    = FnTy (subst s a) (subst s r)
     subst s (PolyTy n a)  = PolyTy n (subst (lift n s) a)
               
     -- value of the index x in the substitution s
-    applyS :: Sub -> Nat -> Ty
-    applyS (Inc n)        x  = VarTy (plus n x)           
-    applyS (ty :· s)      x  = case x of
+    applySub :: Sub -> Nat -> Ty
+    applySub (Inc n)        x  = VarTy (plus n x)           
+    applySub (ty :· s)      x  = case x of
                                  Z      -> ty
-                                 (S m)  -> applyS s m
-    applyS (s1 :∘ s2)     x  = subst s2 (applyS s1 x)
+                                 (S m)  -> applySub s m
+    applySub (s1 :∘ s2)     x  = subst s2 (applySub s1 x)
 
                
     |])
@@ -690,8 +690,8 @@ lemma_LiftInc s k (SPolyTy n t)
   = undefined -- TODO!!!
 
 lemma_UpTo :: Sing s -> Sing k -> Sing n ->
-  ApplyS (UpTo k (s :∘ Inc k)) (Plus k n)
-  :~: Subst (Inc k) (ApplyS s n)  
+  applySub (UpTo k (s :∘ Inc k)) (Plus k n)
+  :~: Subst (Inc k) (applySub s n)  
 lemma_UpTo s SZ n = Refl
 lemma_UpTo s (SS m) n 
   | Refl <- lemma_UpTo s m n
@@ -966,7 +966,7 @@ in the list is the substitution for variable i.
 \begin{code}
 instance Index Sub where
   type Element Sub = Ty
-  s !! x = applyS s x
+  s !! x = applySub s x
 \end{code}
 
 \begin{code}

@@ -42,7 +42,7 @@ instance T.SubstC Exp where
    var = VarE
 
    subst s (IntE x)     = IntE x
-   subst s (VarE x)     = T.applyS s x
+   subst s (VarE x)     = T.applySub s x
    subst s (LamE ty e)  = LamE ty (T.subst (T.lift s) e)
    subst s (AppE e1 e2) = AppE (T.subst s e1) (T.subst s e2)
    subst s (TyLam e)    = TyLam (T.subst (substSubTy sIncSub s) e)

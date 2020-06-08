@@ -30,7 +30,7 @@ instance SubstC Exp where
    var = VarE
 
    subst s (IntE x)     = IntE x
-   subst s (VarE x)     = applyS s x
+   subst s (VarE x)     = applySub s x 
    subst s (LamE ty e)  = LamE ty (subst (lift s) e)
    subst s (AppE e1 e2) = AppE (subst s e1) (subst s e2)
 
@@ -76,3 +76,10 @@ typeCheck g (AppE e1 e2) = do
     t12 :-> t22
       | t12 == t2 -> Just t22
     _ -> Nothing
+
+------------------------------------------------------------
+-- Example terms
+
+-- \(x :: Int) -> \(y :: Int) -> x
+example1 :: Exp 
+example1 = LamE IntTy (LamE IntTy (VarE 1))

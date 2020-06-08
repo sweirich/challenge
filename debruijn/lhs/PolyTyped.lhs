@@ -14,7 +14,7 @@
 >       var = VarTy
 >       subst s IntTy       = IntTy
 >       subst s (t1 :-> t2) = subst s t1 :-> subst s t2
->       subst s (VarTy x)   = applyS s x
+>       subst s (VarTy x)   = applySub s x
 >       subst s (PolyTy t)  = PolyTy (subst (lift s) t)
 >  |])
 
@@ -48,7 +48,7 @@
 >    var = VarE
 > 
 >    subst s (IntE x)     = IntE x
->    subst s (VarE x)     = T.applyS s x
+>    subst s (VarE x)     = T.applySub s x
 >    subst s (LamE ty e)  = LamE ty (T.subst (T.lift s) e)
 >    subst s (AppE e1 e2) = AppE (T.subst s e1) (T.subst s e2)
 >    subst s (TyLam e)    = TyLam (T.subst (substTy_Sub SInc s) e)

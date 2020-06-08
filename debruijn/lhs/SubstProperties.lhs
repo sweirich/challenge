@@ -17,7 +17,7 @@ A simple instance of the SubstC type class for use to test the properties.
 >        deriving (Eq, Show)
 >    instance SubstC Exp where
 >      var = VarE
->      subst s (VarE x)  = applyS s x
+>      subst s (VarE x)  = applySub s x
 >      subst s (LamE e)  = LamE (subst (lift s) e)
 > 
 >    |])
@@ -69,13 +69,13 @@ This property is an analogue about exchanging two substitutions.
 
 
 > prop_Assoc :: (Eq a, SubstC a) => Sub a -> Sub a -> Sub a -> Idx -> Bool
-> prop_Assoc s1 s2 s3 x = applyS ((s1 <> s2) <> s3) x == applyS (s1 <> (s2 <> s3)) x
+> prop_Assoc s1 s2 s3 x = applySub ((s1 <> s2) <> s3) x == applySub (s1 <> (s2 <> s3)) x
 
 > prop_IdL :: (Eq a, SubstC a) => Sub a -> Idx -> Bool
-> prop_IdL s x = applyS (s <> IdS) x == applyS s x
+> prop_IdL s x = applySub (s <> IdS) x == applySub s x
 
 > prop_IdR :: (Eq a, SubstC a) => Sub a -> Idx -> Bool
-> prop_IdR s x = applyS (IdS <> s) x == applyS s x
+> prop_IdR s x = applySub (IdS <> s) x == applySub s x
 
 
 * Property 0

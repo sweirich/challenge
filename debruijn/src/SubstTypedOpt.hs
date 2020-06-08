@@ -8,7 +8,7 @@ module SubstTypedOpt(
    -- * -- Substitution class & constructors
    Idx(..), Sub(..), IncBy(..), SubstC(..), 
    nilSub, incSub, single, comp, 
-   applyS, mapIdx, mapInc, addBy, singIndx
+   applySub, mapIdx, mapInc, addBy, singIndx
  ) where
 
 import qualified Nat (Nat(..),SNat(..),Length,length,LengthSym0)
@@ -109,11 +109,11 @@ class SubstC (a :: [k] -> k -> Type) where
    subst :: Sub a g g' -> a g t -> a g' t
 
 -- | Value of the index x in the substitution s
-applyS :: SubstC a => Sub a g g' -> Idx g t -> a g' t
-applyS (Inc n)       x  = var (add n x)            
-applyS (ty :< s)     Z  = ty
-applyS (ty :< s)  (S x) = applyS s x
-applyS (s1 :<> s2)   x  = subst s2 (applyS s1 x)
+applySub :: SubstC a => Sub a g g' -> Idx g t -> a g' t
+applySub (Inc n)       x  = var (add n x)            
+applySub (ty :< s)     Z  = ty
+applySub (ty :< s)  (S x) = applySub s x
+applySub (s1 :<> s2)   x  = subst s2 (applySub s1 x)
 
 --singleSub :: a g t -> Sub a (t:g) g
 singleSub t = t :< Inc IZ

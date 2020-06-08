@@ -86,12 +86,12 @@ to that type.
 >        subst :: Sub a -> a -> a
 
 >     --  Value of the index x in the substitution s
->     applyS :: SubstC a => Sub a -> Idx -> a
->     applyS IdS            x  = var x
->     applyS Inc            x  = var (S x)
->     applyS (ty :· s)      Z  = ty
->     applyS (ty :· s)   (S x) = applyS s x
->     applyS (s1 :<> s2)    x  = subst s2 (applyS s1 x)
+>     applySub :: SubstC a => Sub a -> Idx -> a
+>     applySub IdS            x  = var x
+>     applySub Inc            x  = var (S x)
+>     applySub (ty :· s)      Z  = ty
+>     applySub (ty :· s)   (S x) = applySub s x
+>     applySub (s1 :<> s2)    x  = subst s2 (applySub s1 x)
 >
 >
 >   |])
@@ -141,7 +141,7 @@ substitution operations that can be defined with this algebra.
 
 
 > {- NOTE: optimization for above. Won't do it now.
-> applyS s x | Just f <- isIncN s = var (f x)
+> applySub s x | Just f <- isIncN s = var (f x)
 > isIncN :: Sub a -> Maybe (Nat -> Nat)
 > isIncN IdS        = Just id
 > isIncN (Inc :∘ s) = (S .) <$> isIncN s

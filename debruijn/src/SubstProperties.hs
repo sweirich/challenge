@@ -20,7 +20,7 @@ data Exp :: Type where
 
 instance SubstC Exp where
   var = VarE
-  subst s (VarE x)  = applyS s x
+  subst s (VarE x)  = applySub s x
   subst s (LamE e)  = LamE (subst (lift s) e)
 
 -------------------------------------------------------------------
@@ -99,13 +99,13 @@ instance Monoid (Sub a) where
    mempty = nilSub
 
 prop_assoc :: Sub Exp -> Sub Exp -> Sub Exp -> Idx -> Bool
-prop_assoc s1 s2 s3 x = applyS ((s1 <> s2) <> s3) x == applyS (s1 <> (s2 <> s3)) x
+prop_assoc s1 s2 s3 x = applySub ((s1 <> s2) <> s3) x == applySub (s1 <> (s2 <> s3)) x
 
 prop_idL :: Sub Exp -> Idx -> Bool
-prop_idL s x = applyS (s <> nilSub) x == applyS s x
+prop_idL s x = applySub (s <> nilSub) x == applySub s x
 
 prop_idR :: Sub Exp -> Idx -> Bool
-prop_idR s x = applyS (nilSub <> s) x == applyS s x
+prop_idR s x = applySub (nilSub <> s) x == applySub s x
 
 prop_id :: Exp -> Bool
 prop_id x = subst nilSub x == x 

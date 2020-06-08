@@ -38,14 +38,14 @@ in types, for terms in terms, and for types in terms.
 
 >     subst s IntTy       = IntTy
 >     subst s (t1 :-> t2) = subst s t1 :-> subst s t2
->     subst s (VarTy x)   = applyS s x
+>     subst s (VarTy x)   = applySub s x
 >     subst s (PolyTy t)  = PolyTy (subst (lift s) t)
 
 > instance SubstC Exp where
 >    var = VarE
 > 
 >    subst s (IntE x)     = (IntE x)
->    subst s (VarE x)     = applyS s x
+>    subst s (VarE x)     = applySub s x
 >    subst s (LamE ty e)  = LamE ty (subst (lift s) e)
 >    subst s (AppE e1 e2) = AppE (subst s e1) (subst s e2)
 >    subst s (TyLam e)    = TyLam (subst (substTy_Sub Inc s) e)    --- note, this line is hard to motivate

@@ -25,11 +25,11 @@ data Sub a ??? where
    (:<>) :: Sub a ??? -> Sub a ??? -> Sub a ???
 
 -- What type of term do we get when we look up an `Idx` in the substitution? 
-applyS :: SubstC a => Sub a ??? -> Idx ??? -> a ???
-applyS (Inc n)       x  = var (add n x)
-applyS (ty :< s)     Z  = ty
-applyS (ty :< s)  (S x) = applyS s x
-applyS (s1 :<> s2)   x  = subst s2 (applyS s1 x)
+applySub :: SubstC a => Sub a ??? -> Idx ??? -> a ???
+applySub (Inc n)       x  = var (add n x)
+applySub (ty :< s)     Z  = ty
+applySub (ty :< s)  (S x) = applySub s x
+applySub (s1 :<> s2)   x  = subst s2 (applySub s1 x)
 
 class SubstC a where
    var   :: Idx ??? -> a ???
@@ -63,7 +63,7 @@ instance SubstC Exp where
    var = VarE
 
    subst s (IntE x)     = IntE x
-   subst s (VarE x)     = applyS s x
+   subst s (VarE x)     = applySub s x
    subst s (LamE ty e)  = LamE ty (subst (lift s) e)
    subst s (AppE e1 e2) = AppE (subst s e1) (subst s e2)
 ```

@@ -139,7 +139,7 @@ The above development specializes the `Sub` datatype and associated operations t
 Therefore, we can define a type class to classify all types that have these operations:
 
 ```haskell
-class SubstC a where
+class SubstDB a where
    var   :: Idx -> a
    subst :: Sub a -> a -> a
 ```
@@ -147,7 +147,7 @@ class SubstC a where
 and then instantiate this class with each datatype that we would like to use with substitution [2].
 
 ```haskell
-instance SubstC Exp where
+instance SubstDB Exp where
   var = Var
   subst s (IntE x)    = IntE x
   subst s (Var i)     = applySub s i

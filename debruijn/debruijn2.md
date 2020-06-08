@@ -25,18 +25,18 @@ data Sub a ??? where
    (:<>) :: Sub a ??? -> Sub a ??? -> Sub a ???
 
 -- What type of term do we get when we look up an `Idx` in the substitution? 
-applySub :: SubstC a => Sub a ??? -> Idx ??? -> a ???
+applySub :: SubstDB a => Sub a ??? -> Idx ??? -> a ???
 applySub (Inc n)       x  = var (add n x)
 applySub (ty :< s)     Z  = ty
 applySub (ty :< s)  (S x) = applySub s x
 applySub (s1 :<> s2)   x  = subst s2 (applySub s1 x)
 
-class SubstC a where
+class SubstDB a where
    var   :: Idx ??? -> a ???
    subst :: Sub a ??? -> a ??? -> ???
 
 -- How does lift modify the substitution?
-lift :: SubstC a => Sub a ??? -> Sub a ???
+lift :: SubstDB a => Sub a ??? -> Sub a ???
 lift s = var Z :< (s :<> Inc 1)
 ```
 
@@ -59,7 +59,7 @@ data Exp ??? where
         -> Exp ???
 
 -- Same definition as in `Simple`
-instance SubstC Exp where
+instance SubstDB Exp where
    var = VarE
 
    subst s (IntE x)     = IntE x
@@ -183,7 +183,7 @@ singleSub t = t :< Inc IZ
 ```
 
 ```haskell
---lift :: SubstC a => Sub a g g' -> Sub a (t:g) (t:g')
+--lift :: SubstDB a => Sub a g g' -> Sub a (t:g) (t:g')
 lift s = var Z :< (s :<> Inc (IS IZ))
 ```
 

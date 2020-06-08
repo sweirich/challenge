@@ -61,12 +61,12 @@ add :: IncBy g1 -> Idx g t -> Idx (g1 ++ g) t
 add IZ i = i
 add (IS xs) i = S (add xs i)
 
-class SubstC (a :: [k] -> k -> Type) where
+class SubstDB (a :: [k] -> k -> Type) where
    var   :: Idx g t -> a g t
    subst :: Sub a g g' -> a g t -> a g' t
 
 -- | Value of the index x in the substitution s
-applySub :: SubstC a => Sub a g g' -> Idx g t -> a g' t
+applySub :: SubstDB a => Sub a g g' -> Idx g t -> a g' t
 applySub (Inc n)       x  = var (add n x)            
 applySub (ty :< s)     Z  = ty
 applySub (ty :< s)  (S x) = applySub s x
@@ -75,7 +75,7 @@ applySub (s1 :<> s2)   x  = subst s2 (applySub s1 x)
 --singleSub :: a g t -> Sub a (t:g) g
 singleSub t = t :< Inc IZ
 
---lift :: SubstC a => Sub a g g' -> Sub a (t:g) (t:g')
+--lift :: SubstDB a => Sub a g g' -> Sub a (t:g) (t:g')
 lift s = var Z :< (s :<> Inc (IS IZ))
 
 mapIdx :: forall s g t. Idx g t -> Idx (Map s g) (Apply s t)
@@ -87,7 +87,7 @@ mapInc IZ = IZ
 mapInc (IS n) = IS (mapInc @s n)
 
 
-exchange :: forall t1 t2 a g. SubstC a => Sub a (t1:t2:g) (t2:t1:g)
+exchange :: forall t1 t2 a g. SubstDB a => Sub a (t1:t2:g) (t2:t1:g)
 exchange = var (S Z) :< var Z :< Inc (IS (IS IZ))
 
 

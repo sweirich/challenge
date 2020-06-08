@@ -34,7 +34,7 @@ data Exp :: Nat -> Type where
 -- substitution one step. (i.e. what was at index 0 in the substitution is 
 -- now at index 1, etc.)
 
-instance SubstC Exp where
+instance SubstDB Exp where
    var = VarE
 
    subst s (IntE x)     = IntE x

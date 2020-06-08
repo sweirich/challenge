@@ -33,7 +33,7 @@ Now, let's go to a version with polymorphic types.
 In this version, we need to definition three kinds of substitutions. For types
 in types, for terms in terms, and for types in terms.
 
-> instance SubstC Ty where
+> instance SubstDB Ty where
 >     var = VarTy
 
 >     subst s IntTy       = IntTy
@@ -41,7 +41,7 @@ in types, for terms in terms, and for types in terms.
 >     subst s (VarTy x)   = applySub s x
 >     subst s (PolyTy t)  = PolyTy (subst (lift s) t)
 
-> instance SubstC Exp where
+> instance SubstDB Exp where
 >    var = VarE
 > 
 >    subst s (IntE x)     = (IntE x)

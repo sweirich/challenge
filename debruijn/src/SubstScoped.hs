@@ -61,7 +61,7 @@ incSub = Inc (SS SZ)
 
 -- The var construction must bound the index by the scope
 -- for the term
-class SubstC (a :: Nat -> Type) where
+class SubstDB (a :: Nat -> Type) where
    var   :: Idx n -> a n
    subst :: Sub a n m -> a n -> a m
 
@@ -70,7 +70,7 @@ add SZ x = x
 add (SS m) x = FS (add m x)
 
 --  Value of the index x in the substitution s
-applySub :: SubstC a => Sub a n m -> Idx n -> a m
+applySub :: SubstDB a => Sub a n m -> Idx n -> a m
 --applySub IdS            x  = var x
 applySub (Inc m)        x  = var (add m x)
 applySub (ty :< s)     FZ  = ty
@@ -80,7 +80,7 @@ applySub (s1 :<> s2)    x  = subst s2 (applySub s1 x)
 singleSub :: a n -> Sub a (S n) n
 singleSub t = t :< nilSub
 
-lift :: SubstC a => Sub a n m -> Sub a (S n) (S m)
+lift :: SubstDB a => Sub a n m -> Sub a (S n) (S m)
 lift s = var FZ :< (s :<> incSub)
 
 

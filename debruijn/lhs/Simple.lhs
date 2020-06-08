@@ -34,7 +34,7 @@ Now, let's define the syntax of STLC.
 We can create an instance of the `SubstC` class by defining the substitution
 operation for this term.
 
-> instance SubstC Exp where
+> instance SubstDB Exp where
 >    var = VarE
 > 
 >    subst s (IntE x)     = IntE x

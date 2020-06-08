@@ -10,7 +10,7 @@
 > $(singletons [d|
 >     data Ty = IntTy | Ty :-> Ty | VarTy Idx | PolyTy Ty
 >     
->     instance SubstC Ty where
+>     instance SubstDB Ty where
 >       var = VarTy
 >       subst s IntTy       = IntTy
 >       subst s (t1 :-> t2) = subst s t1 :-> subst s t2
@@ -44,7 +44,7 @@
 
 * Substitution
 
-> instance T.SubstC Exp where
+> instance T.SubstDB Exp where
 >    var = VarE
 > 
 >    subst s (IntE x)     = IntE x

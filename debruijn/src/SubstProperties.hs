@@ -18,7 +18,7 @@ data Exp :: Type where
   LamE   :: Exp  -> Exp          
     deriving (Eq, Show)
 
-instance SubstC Exp where
+instance SubstDB Exp where
   var = VarE
   subst s (VarE x)  = applySub s x
   subst s (LamE e)  = LamE (subst (lift s) e)
@@ -42,7 +42,7 @@ prop_1 s g = map (subst (lift s)) (map (subst incSub) g) ==
 -- With effort, we can also check this property at runtime. But this
 -- also requires that we keep around more information at runtime.
 check1 :: forall a (g ::[a]) (s :: Sub a).
-          (TestEquality (Sing :: a -> Type), SSubstC a, SDecide a) =>
+          (TestEquality (Sing :: a -> Type), SSubstDB a, SDecide a) =>
           Sing g -> Sing s ->
            Maybe (Map (SubstSym1 (LiftSym1 s)) (Map (SubstSym1 IncSub) g) :~: 
                   Map (SubstSym1 IncSub) (Map (SubstSym1 s) g))

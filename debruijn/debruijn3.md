@@ -33,7 +33,7 @@ The first two are generally straightforward and follow directly from the pattern
 ## Types-in-types
 
 ```haskell
-instance SubstC Ty where
+instance SubstDB Ty where
     var = VarTy
 
     subst s IntTy       = IntTy
@@ -59,7 +59,7 @@ substTy s (TyApp e t)  = TyApp (substTy s e) (subst s t)
 The only part that requires thought is the `TyLam` case of term-in-term substitution.
 
 ```haskell
-instance SubstC Exp where
+instance SubstDB Exp where
    var = VarE
 
    subst s (IntE x)     = IntE x

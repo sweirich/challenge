@@ -27,7 +27,7 @@ data Exp :: [Ty] -> Ty -> Type where
 
  SubE   :: Sub Exp g g' -> Exp g t -> Exp g' t
  
-instance SubstC Exp where
+instance SubstDB Exp where
    var = VarE
 
    subst s (IntE x)     = IntE x

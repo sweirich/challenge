@@ -37,7 +37,7 @@ Now, let's define the syntax of STLC using a GADT.
 Even though the types are much more ornate, the code that we write for substitution is
 identical to the untyped AST.
 
-> instance SubstC Exp where
+> instance SubstDB Exp where
 >    var = VarE
 > 
 >    subst s (IntE x)     = (IntE x)

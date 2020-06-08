@@ -34,7 +34,7 @@ data Exp :: [Ty] -> Ty -> Type where
          -> Π t2               -- type argument
          -> Exp g (Subst (SingleSub t2) t1)
 
-instance T.SubstC Exp where
+instance T.SubstDB Exp where
    var = VarE
 
    subst s (IntE x)     = IntE x

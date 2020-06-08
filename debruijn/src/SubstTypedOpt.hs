@@ -22,22 +22,22 @@ import Unsafe.Coerce(unsafeCoerce)
 data Bind a t1 g t2 = forall g'. Bind (Sub a g' (t1:g)) (a g' t2)
 
 -- introdue a binder
-bind :: SubstC a => a (t1:g) t2 -> Bind a t1 g t2
+bind :: SubstDB a => a (t1:g) t2 -> Bind a t1 g t2
 bind = Bind (Inc IZ)
 {-# INLINABLE bind #-}
 
 -- expose the body of the binder
-unbind :: SubstC a => Bind a t1 g t2 -> a (t1:g) t2
+unbind :: SubstDB a => Bind a t1 g t2 -> a (t1:g) t2
 unbind (Bind s a) = subst s a
 {-# INLINABLE unbind #-}
 
 -- replace the variable bound at the binder
-instantiate :: SubstC a => Bind a t1 g t2 -> a g t1 -> a g t2
+instantiate :: SubstDB a => Bind a t1 g t2 -> a g t1 -> a g t2
 instantiate (Bind s a) b = subst (comp s (single b)) a
 {-# INLINABLE instantiate #-}
 
 -- apply a substitution to a binder
-substBind :: SubstC a => Sub a g1 g2 -> Bind a t1 g1 t2 -> Bind a t1 g2 t2
+substBind :: SubstDB a => Sub a g1 g2 -> Bind a t1 g1 t2 -> Bind a t1 g2 t2
 substBind s2 (Bind s1 e) = Bind (comp s1 (lift s2)) e
 {-# INLINABLE substBind #-}
 
@@ -104,12 +104,12 @@ add :: IncBy g1 -> Idx g t -> Idx (g1 ++ g) t
 add IZ i = i
 add (IS xs) i = S (add xs i)
 
-class SubstC (a :: [k] -> k -> Type) where
+class SubstDB (a :: [k] -> k -> Type) where
    var   :: Idx g t -> a g t
    subst :: Sub a g g' -> a g t -> a g' t
 
 -- | Value of the index x in the substitution s
-applySub :: SubstC a => Sub a g g' -> Idx g t -> a g' t
+applySub :: SubstDB a => Sub a g g' -> Idx g t -> a g' t
 applySub (Inc n)       x  = var (add n x)            
 applySub (ty :< s)     Z  = ty
 applySub (ty :< s)  (S x) = applySub s x
@@ -118,7 +118,7 @@ applySub (s1 :<> s2)   x  = subst s2 (applySub s1 x)
 --singleSub :: a g t -> Sub a (t:g) g
 singleSub t = t :< Inc IZ
 
---lift :: SubstC a => Sub a g g' -> Sub a (t:g) (t:g')
+--lift :: SubstDB a => Sub a g g' -> Sub a (t:g) (t:g')
 lift s = var Z :< (s :<> Inc (IS IZ))
 
 mapIdx :: forall s g t. Idx g t -> Idx (Map s g) (Apply s t)
@@ -130,14 +130,14 @@ mapInc IZ = IZ
 mapInc (IS n) = IS (mapInc @s n)
 
 
-exchange :: forall t1 t2 a g. SubstC a => Sub a (t1:t2:g) (t2:t1:g)
+exchange :: forall t1 t2 a g. SubstDB a => Sub a (t1:t2:g) (t2:t1:g)
 exchange = var (S Z) :< var Z :< Inc (IS (IS IZ))
 
 addBy :: IncBy g1 -> IncBy g2 -> IncBy (g1 ++ g2) 
 addBy IZ      i = i
 addBy (IS xs) i = IS (addBy xs i)
 
-comp :: SubstC a => Sub a g1 g2 -> Sub a g2 g3 -> Sub a g1 g3 
+comp :: SubstDB a => Sub a g1 g2 -> Sub a g2 g3 -> Sub a g1 g3 
 -- comp (Inc (k1 :: IncBy g1)) (Inc (k2 :: IncBy g2)) 
 --  | Refl <- assoc @g1 @g2  = Inc (addBy k1 k2)
 comp (Inc IZ) s       = s

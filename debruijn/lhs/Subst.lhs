@@ -81,12 +81,12 @@ to that type.
 >        S :: Idx -> Idx
 >         deriving (Eq, Show)
 >
->     class SubstC a where
+>     class SubstDB a where
 >        var   :: Idx -> a 
 >        subst :: Sub a -> a -> a
 
 >     --  Value of the index x in the substitution s
->     applySub :: SubstC a => Sub a -> Idx -> a
+>     applySub :: SubstDB a => Sub a -> Idx -> a
 >     applySub IdS            x  = var x
 >     applySub Inc            x  = var (S x)
 >     applySub (ty :· s)      Z  = ty
@@ -111,7 +111,7 @@ Finally, we can define the |lift| substitution, which is exactly what we need
 when working with substitutions under binders.
 
 > $(singletons [d|
->     lift :: SubstC a => Sub a -> Sub a
+>     lift :: SubstDB a => Sub a -> Sub a
 >     lift s = var Z :· (s :<> Inc)
 >     |])
 
@@ -120,14 +120,14 @@ We can also map the substitution, inc and lift operations across a list
 of terms.
 
 > $(singletons [d|
->      substList :: SubstC a => Sub a -> [a] -> [a]
+>      substList :: SubstDB a => Sub a -> [a] -> [a]
 >      substList s [] = []
 >      substList s (t:g) = subst s t : substList s g
 >
->      incList :: SubstC a => [a] -> [a]
+>      incList :: SubstDB a => [a] -> [a]
 >      incList = substList Inc
 >
->      liftList :: SubstC a => Sub a -> [a] -> [a]
+>      liftList :: SubstDB a => Sub a -> [a] -> [a]
 >      liftList s = substList (lift s)
 >      |])
 > 
@@ -154,14 +154,14 @@ are left alone, and any free variables in the range of |s| are all incremented
 by |n|.
 
 > $(singletons [d|
->     liftN :: SubstC a => Nat -> Sub a -> Sub a
+>     liftN :: SubstDB a => Nat -> Sub a -> Sub a
 >     liftN k s = upTo k (s :∘ incN k)
 >
->     incN :: SubstC a => Nat -> Sub a
+>     incN :: SubstDB a => Nat -> Sub a
 >     incN Z = IdS
 >     incN (S n) = (Inc :∘ incN n)
 
->     upTo :: SubstC a => Nat -> Sub a -> Sub a
+>     upTo :: SubstDB a => Nat -> Sub a -> Sub a
 >     upTo Z s     = s
 >     upTo (S m) s = upTo m (var m :· s)
 >   |])

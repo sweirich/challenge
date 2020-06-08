@@ -10,7 +10,7 @@ $(singletons [d|
   data Ty = IntTy | Ty :-> Ty | VarTy Idx | PolyTy Ty
     deriving (Eq, Show)
 
-  instance SubstC Ty where
+  instance SubstDB Ty where
     var = VarTy
 
     subst s IntTy       = IntTy
@@ -37,7 +37,7 @@ data Exp :: Type where
         -> Ty       -- type argument
         -> Exp
 
-instance SubstC Exp where
+instance SubstDB Exp where
    var = VarE
 
    subst s (IntE x)     = IntE x

@@ -38,7 +38,7 @@ data Exp :: [Ty] -> Ty -> Type where
 
 -- Although the types are much more explicit, the actual code of the instance
 -- definition is unchanged from [Poly.hs](Poly.hs)
-instance T.SubstC Exp where
+instance T.SubstDB Exp where
    var = VarE
 
    subst s (IntE x)     = IntE x

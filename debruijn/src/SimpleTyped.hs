@@ -25,7 +25,7 @@ data Exp :: [Ty] -> Ty -> Type where
         -> Exp g t2
  
 -- same instance definition as before
-instance SubstC Exp where
+instance SubstDB Exp where
    var = VarE
 
    subst s (IntE x)     = IntE x

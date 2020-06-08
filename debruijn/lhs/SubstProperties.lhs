@@ -8,14 +8,14 @@
 >
 > import Unsafe.Coerce
 
-A simple instance of the SubstC type class for use to test the properties.
+A simple instance of the SubstDB type class for use to test the properties.
 
 > $(singletons [d|
 >    data Exp :: Type where
 >      VarE   :: Idx  -> Exp 
 >      LamE   :: Exp  -> Exp          
 >        deriving (Eq, Show)
->    instance SubstC Exp where
+>    instance SubstDB Exp where
 >      var = VarE
 >      subst s (VarE x)  = applySub s x
 >      subst s (LamE e)  = LamE (subst (lift s) e)
@@ -68,13 +68,13 @@ This property is an analogue about exchanging two substitutions.
 >    mempty = IdS
 
 
-> prop_Assoc :: (Eq a, SubstC a) => Sub a -> Sub a -> Sub a -> Idx -> Bool
+> prop_Assoc :: (Eq a, SubstDB a) => Sub a -> Sub a -> Sub a -> Idx -> Bool
 > prop_Assoc s1 s2 s3 x = applySub ((s1 <> s2) <> s3) x == applySub (s1 <> (s2 <> s3)) x
 
-> prop_IdL :: (Eq a, SubstC a) => Sub a -> Idx -> Bool
+> prop_IdL :: (Eq a, SubstDB a) => Sub a -> Idx -> Bool
 > prop_IdL s x = applySub (s <> IdS) x == applySub s x
 
-> prop_IdR :: (Eq a, SubstC a) => Sub a -> Idx -> Bool
+> prop_IdR :: (Eq a, SubstDB a) => Sub a -> Idx -> Bool
 > prop_IdR s x = applySub (IdS <> s) x == applySub s x
 
 
@@ -83,10 +83,10 @@ This property is an analogue about exchanging two substitutions.
 This is a property that is true about well-formed instances of SubstC. Say we
 view Exp above as a functor, where the argument is 'Idx'
 
-> prop_Id :: (Eq a, SubstC a) => a -> Bool
+> prop_Id :: (Eq a, SubstDB a) => a -> Bool
 > prop_Id x = subst IdS x == x 
 
-> prop_Comp :: (Eq a, SubstC a) => Sub a -> Sub a -> a -> Bool
+> prop_Comp :: (Eq a, SubstDB a) => Sub a -> Sub a -> a -> Bool
 > prop_Comp s1 s2 x = subst s2 (subst s1 x) == subst (s1 <> s2) x
 
 

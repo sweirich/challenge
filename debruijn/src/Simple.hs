@@ -26,7 +26,7 @@ data Exp :: Type where
          -> Exp
      deriving (Eq, Show)
 
-instance SubstC Exp where
+instance SubstDB Exp where
    var = VarE
 
    subst s (IntE x)     = IntE x

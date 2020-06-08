@@ -9,7 +9,7 @@ $(singletons [d|
     -- An index: (i.e. just a natural number)
     type Idx = Nat
 
-   -- A substitution algebra
+   -- A substitution (represented by a datatype)
     data Sub a =
        Inc Idx              --  increment by an index amount                
      | a :< Sub a           --  extend a substitution (like cons)
@@ -19,6 +19,14 @@ $(singletons [d|
     infixr :<     -- like usual cons operator (:)
     infixr :<>    -- like usual composition  (.)
  
+   --  Value of the index x in the substitution
+    applySub :: SubstDB a => Sub a -> Idx -> a
+    applySub (Inc k)        x  = var (plus k x)
+    applySub (ty :< s)      Z  = ty
+    applySub (ty :< s)   (S x) = applySub s x
+    applySub (s1 :<> s2)    x  = subst s2 (applySub s1 x)
+
+
     -- identity substitution, leaves all variables alone
     nilSub :: Sub a 
     nilSub = Inc Z
@@ -33,25 +41,20 @@ $(singletons [d|
     singleSub t = t :< nilSub
 
     -- General class for terms that support substitution
-    class SubstC a where
+    class SubstDB a where
        -- variable data constructor
        var   :: Idx -> a 
        -- term traversal
        subst :: Sub a -> a -> a
 
-    --  Value of the index x in the substitution s
-    applySub :: SubstC a => Sub a -> Idx -> a
-    applySub (Inc k)        x  = var (plus k x)
-    applySub (ty :< s)      Z  = ty
-    applySub (ty :< s)   (S x) = applySub s x
-    applySub (s1 :<> s2)    x  = subst s2 (applySub s1 x)
+    
  
     -- Used in substitution when going under a binder
-    lift :: SubstC a => Sub a -> Sub a
+    lift :: SubstDB a => Sub a -> Sub a
     lift s = var Z :< (s :<> incSub)
  
     -- increment all terms in a list 
-    incList :: SubstC a => [a] -> [a]
+    incList :: SubstDB a => [a] -> [a]
     incList = map (subst incSub)
 
  |])

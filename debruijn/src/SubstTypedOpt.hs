@@ -6,7 +6,7 @@ module SubstTypedOpt(
    -- * -- Abstract type for binding locations
    Bind, bind, unbind, instantiate, substBind,
    -- * -- Substitution class & constructors
-   Idx(..), Sub(..), IncBy(..), SubstC(..), 
+   Idx(..), Sub(..), IncBy(..), SubstDB(..), 
    nilSub, incSub, single, comp, 
    applySub, mapIdx, mapInc, addBy, singIndx
  ) where

@@ -1,5 +1,5 @@
-# lts-15.14 also works
-resolver: lts-15.3
+# lts-15.3 (i.e. GHC 8.8.3) also works
+resolver: lts-15.14
 flags: {}
 extra-package-dbs: []
 extra-deps: []

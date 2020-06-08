@@ -48,7 +48,6 @@ $(singletons [d|
        subst :: Sub a -> a -> a
 
     
- 
     -- Used in substitution when going under a binder
     lift :: SubstDB a => Sub a -> Sub a
     lift s = var Z :< (s :<> incSub)

@@ -44,7 +44,6 @@ step (IntE x)     = Nothing
 step (VarE n)     = error "Unbound Variable"
 step (LamE t e)   = Nothing
 step (AppE e1 e2) = Just $ stepApp e1 e2 where
-
    stepApp :: Exp -> Exp -> Exp 
    stepApp (IntE x)       e2 = error "Type error"
    stepApp (VarE n)       e2 = error "Unbound variable"

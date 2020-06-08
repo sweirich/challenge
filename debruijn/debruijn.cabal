@@ -37,7 +37,8 @@ library
   -- other-extensions:
   build-depends:       base >=4.13,
                        singletons >= 2.6,
-                       QuickCheck >= 2.12
+                       QuickCheck >= 2.12,
+                       Cabal
 
   hs-source-dirs:      src
 
@@ -70,21 +71,4 @@ library
 
   ghc-options:         -fwarn-incomplete-patterns
 
-executable debruijn-profiling
-  main-is:             Main.hs
-  other-modules:       Lambda
-                       Lennart
-  hs-source-dirs: src, bench
-  default-language:    Haskell2010
-  ghc-options:
-    -threaded
-    -fprof-auto
-    "-with-rtsopts=-N -p -s -h -i0.1"
-  build-depends:
-    debruijn,
-    base >= 4.12,
-    containers,
-    raw-strings-qq,
-    singletons >= 2.5.1,
-    criterion,
-    pretty >= 1.1.3
+

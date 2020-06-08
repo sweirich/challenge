@@ -16,7 +16,7 @@ data Ty = IntTy | Ty :-> Ty   -- s
 data Exp = IntE Int | VarE Idx | LamE Exp | AppE Exp Exp
 ```
 
-Then the lambda calculus expression `\x y -> x` can be represented with the expression
+Then the lambda calculus expression `\(x :: Int) (y :: Int) -> x` can be represented with the expression
 
 ```haskell
 LamE IntTy (LamE IntTy (VarE 1))
@@ -24,7 +24,7 @@ LamE IntTy (LamE IntTy (VarE 1))
 
 showing that the variable inside the term resolves to not the closest enclosing lambda (index 0) but the next one (index 1).
 
-Similarly, the lambda calculus expression `\x -> (\y -> x y) x` can be represented with the expression
+Similarly, the lambda calculus expression `\(x :: t1) -> (\(y :: t2) -> x y) x` can be represented with the expression
 
 ```haskell
 LamE t1 (AppE (LamE t2 (AppE (VarE 1) (VarE 0))) (VarE 0)

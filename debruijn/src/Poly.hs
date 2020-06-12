@@ -20,6 +20,8 @@ $(singletons [d|
   
     |])
 
+-- | An AST for System F
+-- Adds data constructors for type abstraction and type application
 data Exp :: Type where
  IntE   :: Int
         -> Exp
@@ -37,16 +39,29 @@ data Exp :: Type where
         -> Ty       -- type argument
         -> Exp
 
+-- Example, the polymorphic identity function
+polyId :: Exp 
+polyId = TyLam (LamE (VarTy Z) (VarE Z))
+
+-- Example, an instance of the polymorphic identity function
+intId :: Exp
+intId = TyApp polyId IntTy
+
+-- Substitution for expressions in expressions
 instance SubstDB Exp where
+
+   var :: Idx -> Exp
    var = VarE
 
+   subst :: Sub Exp -> Exp -> Exp
    subst s (IntE x)     = IntE x
    subst s (VarE x)     = applySub s x
    subst s (LamE ty e)  = LamE ty (subst (lift s) e)
    subst s (AppE e1 e2) = AppE (subst s e1) (subst s e2)
-   subst s (TyLam e)    = TyLam (subst (fmap (substTy incSub) s) e)  
+   subst s (TyLam e)    = TyLam (subst (incTy s) e)  
    subst s (TyApp e t)  = TyApp (subst s e) t
 
+-- | Apply  a type substitution to an expression
 substTy :: Sub Ty -> Exp -> Exp
 substTy s (IntE x)     = IntE x
 substTy s (VarE n)     = VarE n
@@ -56,7 +71,13 @@ substTy s (TyLam e)    = TyLam (substTy (lift s) e)
 substTy s (TyApp e t)  = TyApp (substTy s e) (subst s t)
 
 
----------------------------------------------------------------------------------
+-- | Increment all types in an expression substitution
+incTy :: Sub Exp -> Sub Exp
+incTy = fmap (substTy incSub)
+
+
+
+----------------------------------------------------------------
 
 -- | Small-step evaluation of closed terms
 step :: Exp -> Maybe Exp

@@ -9,9 +9,12 @@ import Imports
 import qualified Nat   as U
 import qualified Subst as U
 import qualified Poly  as U
+
 import Poly (Ty(..),STy(..)) -- types are shared between the two languages.
+import PolyTyped
+
 import SubstTyped
-import PolyTyped 
+import SubstProperties
 
 -- | The result type of the type checker. Either the term type checks in
 -- the given context or there is some sort of type error.
@@ -54,7 +57,7 @@ tcExp g (U.AppE u1 u2) =
       Errors s -> Errors s
     Errors s -> Errors s
 tcExp g (U.TyLam u1)
-  = case tcExp (U.sIncList g) u1 of
+  = case tcExp (sIncList g) u1 of
       Checks t1 e1 -> Checks (U.SPolyTy t1) (TyLam e1)
       Errors s     -> Errors s
 tcExp g (U.TyApp u1 ty)

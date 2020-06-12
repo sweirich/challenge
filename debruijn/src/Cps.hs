@@ -5,13 +5,16 @@ module Cps where
 import Prelude hiding ((!!),(>>),drop,take,length)
 import Test.QuickCheck hiding ((===))
 
-import Imports
 import Nat
+import Imports
+
 import AssertEquality
 import Poly(Ty(..),STy(..),PolyTySym0,VarTySym0)
-import Subst
 import PolyTyped
-import qualified SubstTyped as ST
+
+import qualified Subst as U
+import qualified SubstTyped as T
+import SubstProperties
 
 $(singletons [d|
     voidTy = PolyTy (VarTy Z)
@@ -22,7 +25,7 @@ $(singletons [d|
 -- | Access a runtime version of the type
 -- of a (well-typed) expression
 typeOf :: Sing g -> Exp g t -> Sing t
-typeOf g (VarE v)       = ST.singIndx g v
+typeOf g (VarE v)       = T.singIndx g v
 typeOf g (IntE x)       =
   SIntTy
 typeOf g (LamE t1 e)    =
@@ -34,7 +37,7 @@ typeOf g (TyLam e)    =
   SPolyTy (typeOf (sIncList g) e)
 typeOf g (TyApp e tys)  =
   case typeOf g e of
-    SPolyTy t1 -> sSubst (sSingleSub tys) t1
+    SPolyTy t1 -> U.sSubst (U.sSingleSub tys) t1
 
 ------------------------------------------------
 -- This part is the type translation. To make it work, 
@@ -90,19 +93,19 @@ data Cont g t where
 
 applyCont :: Cont g t -> Exp g t -> Exp g VoidTy
 applyCont (Obj o)  v  = AppE o v
-applyCont (Meta k) v  = ST.subst (ST.singleSub v) k
+applyCont (Meta k) v  = T.subst (T.singleSub v) k
 
 reifyCont :: Sing t -> Cont g t -> Exp g (t :-> VoidTy)
 reifyCont t (Obj o)   = o
 reifyCont t (Meta k)  = LamE t k
 
-substTyCont :: Sing (s :: Sub Ty) -> Cont g t -> Cont (Map (SubstSym1 s) g) (Subst s t)
+substTyCont :: Sing (s :: U.Sub Ty) -> Cont g t -> Cont (Map (U.SubstSym1 s) g) (U.Subst s t)
 substTyCont s (Obj o)   = Obj (substTy s o)
 substTyCont s (Meta k)  = Meta (substTy s k)
 
-substCont :: ST.Sub Exp g g' -> Cont g t -> Cont g' t
-substCont s (Obj o)   = Obj (ST.subst s o)
-substCont s (Meta k)  = Meta (ST.subst (ST.lift s) k)
+substCont :: T.Sub Exp g g' -> Cont g t -> Cont g' t
+substCont s (Obj o)   = Obj (T.subst s o)
+substCont s (Meta k)  = Meta (T.subst (T.lift s) k)
 
 data CpsCtx g g' where
 
@@ -126,14 +129,14 @@ data CpsCtx g g' where
   -- of the parameter and the output has the converted type.
           
 
-cpsIdx :: CpsCtx g g' -> ST.Idx g t -> ST.Idx g' (CpsTy t)
+cpsIdx :: CpsCtx g g' -> T.Idx g t -> T.Idx g' (CpsTy t)
 cpsIdx CpsStart v = case v of {}
-cpsIdx (CpsLamE t1 t2 gg) ST.Z      = ST.S ST.Z
-cpsIdx (CpsLamE t1 t2 gg) (ST.S v)  = ST.S (ST.S (cpsIdx gg v))
-cpsIdx (CpsTyLam t1 gg)   v         = ST.S (cpsIdx gg v)
-cpsIdx (CpsMetaE t1 gg)   ST.Z      = ST.Z
-cpsIdx (CpsMetaE t1 gg)   (ST.S v)  =
-  ST.S (cpsIdx gg v)
+cpsIdx (CpsLamE t1 t2 gg) T.Z      = T.S T.Z
+cpsIdx (CpsLamE t1 t2 gg) (T.S v)  = T.S (T.S (cpsIdx gg v))
+cpsIdx (CpsTyLam t1 gg)   v         = T.S (cpsIdx gg v)
+cpsIdx (CpsMetaE t1 gg)   T.Z      = T.Z
+cpsIdx (CpsMetaE t1 gg)   (T.S v)  =
+  T.S (cpsIdx gg v)
   
 
 cpsExp :: forall t g g'.
@@ -151,7 +154,7 @@ cpsExp g (LamE t1 e1)  k =
                $ LamE (sContTy t2)
                  $ cpsExp (CpsLamE t1 t2 g) e1 k'
   
-        k'  = Obj $ VarE ST.Z
+        k'  = Obj $ VarE T.Z
   
       in
         applyCont k e'    
@@ -162,7 +165,7 @@ cpsExp g (TyLam e) k   =
        $ TyLam 
        $ LamE (sContTy t1) 
        $ cpsExp (CpsTyLam t1
-                 (sIncCpsCtx g)) e (Obj $ VarE ST.Z)
+                 (sIncCpsCtx g)) e (Obj $ VarE T.Z)
  
 cpsExp g (AppE e1 e2)  k =
   case typeOf (fstCtx g) e1 of
@@ -170,13 +173,13 @@ cpsExp g (AppE e1 e2)  k =
       
          k1 :: Cont g' (CpsTy (t1 :-> t2))
          k1 = Meta $ cpsExp (CpsMetaE (t1 :%-> t2) g)
-                        (ST.subst ST.incSub e2) k2
+                        (T.subst T.incSub e2) k2
    
          k2 :: Cont (CpsTy (t1 :-> t2) ': g') (CpsTy t1)
-         k2 =  Meta $ AppE (AppE (VarE (ST.S ST.Z)) (VarE ST.Z))
+         k2 =  Meta $ AppE (AppE (VarE (T.S T.Z)) (VarE T.Z))
                 (reifyCont (sCpsTy t2)
-                 (substCont ST.incSub 
-                   (substCont ST.incSub k)))
+                 (substCont T.incSub 
+                   (substCont T.incSub k)))
    
      in
        cpsExp g e1 k1
@@ -188,35 +191,35 @@ cpsExp (g :: CpsCtx g g') (TyApp e1 (ty :: Sing ty)) k =
       -> 
         let 
           k1 :: Cont g' (CpsTy (PolyTy t1))
-          k1 = Meta $ AppE (TyApp (VarE ST.Z)
+          k1 = Meta $ AppE (TyApp (VarE T.Z)
                               (sCpsTy ty)) (reifyCont t1' k2)
   
           k2 :: Cont (CpsTy (PolyTy t1) ': g') 
-                     (Subst (SingleSub (CpsTy ty)) (CpsTy t1))
-          k2 = substCont ST.incSub k
+                     (U.Subst (U.SingleSub (CpsTy ty)) (CpsTy t1))
+          k2 = substCont T.incSub k
   
-          t1' :: Sing (Subst (SingleSub (CpsTy ty))  (CpsTy t1))
-          t1' = sSubst (sSingleSub (sCpsTy ty)) (sCpsTy t1)
+          t1' :: Sing (U.Subst (U.SingleSub (CpsTy ty))  (CpsTy t1))
+          t1' = U.sSubst (U.sSingleSub (sCpsTy ty)) (sCpsTy t1)
         in
           cpsExp g e1 k1
 
 cpsCommutes :: forall ty.
-             CpsTy (Subst IncSub ty) :~: Subst IncSub (CpsTy ty)
+             CpsTy (U.Subst U.IncSub ty) :~: U.Subst U.IncSub (CpsTy ty)
 cpsCommutes = assertEquality
 
 
 -- Justification for axiom above using quickCheck
 cps_commutes ty =
-   cpsTy (subst incSub ty) == subst incSub (cpsTy ty)
+   cpsTy (U.subst U.incSub ty) == U.subst U.incSub (cpsTy ty)
 
 cpsCommutes2 :: forall ty1 ty.
-             CpsTy (Subst (SingleSub ty1) ty) :~:
-             Subst (SingleSub (CpsTy ty1)) (CpsTy ty)
+             CpsTy (U.Subst (U.SingleSub ty1) ty) :~:
+             U.Subst (U.SingleSub (CpsTy ty1)) (CpsTy ty)
 cpsCommutes2 = assertEquality
 
 -- Justification for axiom above using QuickCheck
 cps_commutes2 tys ty =
-   cpsTy (subst (singleSub tys) ty) == subst (singleSub (cpsTy tys)) (cpsTy ty)
+   cpsTy (U.subst (U.singleSub tys) ty) == U.subst (U.singleSub (cpsTy tys)) (cpsTy ty)
 
 
 
@@ -227,14 +230,14 @@ sIncCpsCtx CpsStart = CpsStart
 sIncCpsCtx (CpsLamE (t1 :: Sing t1) (t2 :: p t2) g)
   | Refl <- cpsCommutes @t1
   , Refl <- cpsCommutes @t2
-  = CpsLamE (sSubst sIncSub t1)
-     (Proxy :: Proxy (Subst IncSub t2)) (sIncCpsCtx g)
+  = CpsLamE (U.sSubst U.sIncSub t1)
+     (Proxy :: Proxy (U.Subst U.IncSub t2)) (sIncCpsCtx g)
 sIncCpsCtx (CpsMetaE (t1 :: Sing t1) g)
   | Refl <- cpsCommutes @t1
-  = CpsMetaE (sSubst sIncSub t1) (sIncCpsCtx g)
+  = CpsMetaE (U.sSubst U.sIncSub t1) (sIncCpsCtx g)
 sIncCpsCtx (CpsTyLam (t1 :: Sing t1) g)
   | Refl <- cpsCommutes @t1
-  = CpsTyLam (sSubst sIncSub t1) (sIncCpsCtx g)
+  = CpsTyLam (U.sSubst U.sIncSub t1) (sIncCpsCtx g)
 
 fstCtx :: CpsCtx g g' -> Sing g
 fstCtx CpsStart = SNil

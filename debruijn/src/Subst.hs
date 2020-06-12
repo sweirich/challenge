@@ -1,5 +1,19 @@
  {-# LANGUAGE TemplateHaskell #-}
-module Subst where
+module Subst
+  (type Idx,
+   type Nat(..), type SNat(..),  ZSym0, SSym0,
+   type Sub(..), type SSub(..),
+
+   applySub,  type ApplySub,  sApplySub,  ApplySubSym0,  ApplySubSym1,
+   nilSub,    type NilSub,    sNilSub,    NilSubSym0, 
+   incSub,    type IncSub,    sIncSub,    IncSubSym0,
+   singleSub, type SingleSub, sSingleSub, SingleSubSym0, SingleSubSym1,
+   lift,      type Lift,      sLift,      LiftSym0,      LiftSym1,
+
+   SubstDB(..),PSubstDB(..),SSubstDB(..),
+   VarSym0, SubstSym0, SubstSym1,
+
+   ) where
 
 import Nat
 import Imports
@@ -51,10 +65,7 @@ $(singletons [d|
     -- Used in substitution when going under a binder
     lift :: SubstDB a => Sub a -> Sub a
     lift s = var Z :< (s :<> incSub)
- 
-    -- increment all terms in a list 
-    incList :: SubstDB a => [a] -> [a]
-    incList = map (subst incSub)
+
 
  |])
 

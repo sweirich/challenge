@@ -72,17 +72,17 @@ applySub (ty :< s)     Z  = ty
 applySub (ty :< s)  (S x) = applySub s x
 applySub (s1 :<> s2)   x  = subst s2 (applySub s1 x)
 
---singleSub :: a g t -> Sub a (t:g) g
+singleSub :: a g t -> Sub a (t:g) g
 singleSub t = t :< Inc IZ
 
---lift :: SubstDB a => Sub a g g' -> Sub a (t:g) (t:g')
+lift :: SubstDB a => Sub a g g' -> Sub a (t:g) (t:g')
 lift s = var Z :< (s :<> Inc (IS IZ))
 
 mapIdx :: forall s g t. Idx g t -> Idx (Map s g) (Apply s t)
 mapIdx Z = Z
 mapIdx (S n) = S (mapIdx @s n)
 
-mapInc :: forall s g t. IncBy g -> IncBy (Map s g)
+mapInc :: forall s g. IncBy g -> IncBy (Map s g)
 mapInc IZ = IZ
 mapInc (IS n) = IS (mapInc @s n)
 

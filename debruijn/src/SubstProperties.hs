@@ -1,5 +1,9 @@
 {-# LANGUAGE TemplateHaskell #-}
-module SubstProperties(axiom1, axiom2, axiom3, axiom4, axiom5, axiom6, axiom_map1, runTests) where
+module SubstProperties(
+  axiom1, axiom2, axiom3, axiom4, axiom5, axiom6,
+  axiom_map1, runTests,
+  IncList, sIncList, LiftList, sLiftList
+  ) where
 
 import AssertEquality
 import Imports
@@ -7,6 +11,19 @@ import Nat
 import Subst
 
 import Test.QuickCheck
+
+-- To simplify the statement of some of the
+-- properties, we define a few operations
+
+$(singletons [d|
+    -- increment all terms in a list 
+    incList :: SubstDB a => [a] -> [a]
+    incList = map (subst incSub)
+
+    -- apply the lift substitution to all terms in the list          
+    liftList :: SubstDB a => Sub a -> [a] -> [a]
+    liftList s = map (subst (lift s))
+  |])
 
 -- To test generic properties, we need to have an instance.
 -- Therefore, we define a simple languages with variables and
@@ -29,14 +46,13 @@ instance SubstDB Exp where
 -- Why should we believe it? Note that if we are *wrong* about this property
 -- we could break Haskell.
 axiom1 :: forall g s. Sing s ->
-           Map (SubstSym1 (LiftSym1 s)) (Map (SubstSym1 IncSub) g) :~: 
-           Map (SubstSym1 IncSub) (Map (SubstSym1 s) g)
+          LiftList s (IncList g) :~: IncList (Map (SubstSym1 s) g)
 axiom1 s = assertEquality
 
 -- We could use quickcheck to convince us, by generating a lot of test cases.
 prop_1 :: Sub Exp -> [Exp] -> Bool
-prop_1 s g = map (subst (lift s)) (map (subst incSub) g) == 
-            map (subst incSub) (map (subst s) g)
+prop_1 s g = liftList s (incList g) == 
+             incList (map (subst s) g)
 
 
 -- With effort, we can also check this property at runtime. But this
@@ -44,14 +60,12 @@ prop_1 s g = map (subst (lift s)) (map (subst incSub) g) ==
 check1 :: forall a (g ::[a]) (s :: Sub a).
           (TestEquality (Sing :: a -> Type), SSubstDB a, SDecide a) =>
           Sing g -> Sing s ->
-           Maybe (Map (SubstSym1 (LiftSym1 s)) (Map (SubstSym1 IncSub) g) :~: 
-                  Map (SubstSym1 IncSub) (Map (SubstSym1 s) g))
+           Maybe (LiftList s (IncList g) :~: 
+                  IncList (Map (SubstSym1 s) g))
 check1 g s = 
   testEquality
-  (sMap (SLambda @_ @_ @(SubstSym1 (LiftSym1 s)) (sSubst (sLift s)))
-     (sMap (SLambda @_ @_ @(SubstSym1 IncSub) (sSubst sIncSub)) g))
-  (sMap (SLambda @_ @_ @(SubstSym1 IncSub) (sSubst sIncSub))
-     (sMap (SLambda @_ @_ @(SubstSym1 s) (sSubst s)) g))
+  (sLiftList s (sIncList g))
+  (sIncList (sMap (SLambda @_ @_ @(SubstSym1 s) (sSubst s)) g))
   
 
 -------------------------------------------------------------------
@@ -123,6 +137,7 @@ prop_map1 s g1 g2 = map (applyFun s) (g1 ++ g2) == map (applyFun s) g1 ++ map (a
 
 axiom_map1 :: forall s g1 g2. Map s (g1 ++ g2) :~: Map s g1 ++ Map s g2
 axiom_map1 = assertEquality
+
 
 prop_map2 :: [Int] -> Bool 
 prop_map2 g = map id g == g

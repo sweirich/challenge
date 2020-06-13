@@ -51,7 +51,7 @@ step (AppE e1 e2) = Just $ stepApp e1 e2 where
     -- Helper function for the AppE case. This function "proves" that we will
     -- *always* take a step if a closed term is an application expression.
     stepApp :: Exp '[] (t1 :-> t2) -> Exp '[] t1  -> Exp '[] t2
-    -- stepApp (IntE x)       e2 = error "Type error"
+    --stepApp (IntE x)       e2 = error "Type error"
     stepApp (VarE n)       e2 = case n of {}    
     stepApp (LamE t e1)    e2 = subst (singleSub e2) e1
     stepApp (AppE e1' e2') e2 = AppE (stepApp e1' e2') e2

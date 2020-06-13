@@ -2,7 +2,10 @@
 
 *Reference files:* [Poly](src/Poly.hs) and [Subst](src/Subst.hs)
 
-Now that we know how to implement substitution generically, we can use it *twice* in our implementation of System F --- once for types and once for terms. Let's do it first with simply-typed substitutions. In the next part we will add type indices to make everything strongly typed.
+Now that we know how to implement substitution generically, we can use it *twice* in our implementation of System F --- once for types and once for terms. Let's do it first with weakly-typed substitutions. In [Part IV](debruijn4.md) we will add type indices to make everything strongly typed.
+
+Our data type definition includes new forms of types for 
+type variables (`VarTy`) and polymorphism (`PolyTy`). Polymorphic types are introduced at a type abstraction (`TyLam`), and instantiated at a type application (`TyApp`).
 
 ```haskell
 data Ty = IntTy | Ty :-> Ty | VarTy Idx | PolyTy Ty
@@ -28,9 +31,11 @@ data Exp :: Type where
 
 We actually need three forms of substitution for this language: types-in-types, types-in-terms, and terms-in-terms.
 
-The first two are generally straightforward and follow directly from the pattern shown in Part I. In particular, they traverse the argument, use `applyS` for variables, and `lift` when going under a binder.
+The first two are generally straightforward and follow directly from the pattern shown in [Part I](debruijn1.mdf). In particular, they traverse the argument, use `applySub` for variables, and `lift` when going under a binder.
 
 ## Types-in-types
+
+For substitution into types, we need only create an instance of the `SubstDB` type class for the `Ty` syntax.
 
 ```haskell
 instance SubstDB Ty where
@@ -66,8 +71,14 @@ instance SubstDB Exp where
    subst s (VarE x)     = applySub s x
    subst s (LamE ty e)  = LamE ty (subst (lift s) e)
    subst s (AppE e1 e2) = AppE (subst s e1) (subst s e2)
-   subst s (TyLam e)    = TyLam (subst (fmap (substTy incSub) s) e)  
+   subst s (TyLam e)    = TyLam (subst (incTy s) e)  
    subst s (TyApp e ty) = TyApp (subst s e) ty
  ```  
 
-In this case, we are going under a binder, but it is a type-variable binder, not a term-variable binder. Because of that difference, we need to shift the type variables in the range of the term substitution, but we don't need to do anything else. Conveniently, substitutions are functors, so we can use `fmap`.
+In this case, we are going under a binder, but it is a type-variable binder, not a term-variable binder. Because of that difference, we need to shift the type variables in the range of the term substitution, but we don't need to do anything else. We do this shifting with the auxiliary function, `incTy`, defined below. Conveniently, substitutions are functors, so we can just use `fmap`.
+
+```haskell
+-- | Increment all types in an expression substitution
+incTy :: Sub Exp -> Sub Exp
+incTy = fmap (substTy incSub)
+```

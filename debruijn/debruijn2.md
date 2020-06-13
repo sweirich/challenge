@@ -4,11 +4,11 @@
 
 ## Type-indexed substitutions
 
-The AST for expressions that we developed in the last part is not type-indexed. It can represent nonsensical STLC terms. In this section we'll add type parameters to the datatype definition so that it can only represent well typed terms.
+The AST for expressions that we developed in the last part is not type-indexed. It can represent nonsensical STLC terms that might trigger an error if we tried to evaluation them. In this section, we'll add type parameters to the datatype definition so that it can only represent well typed terms.
 
 We will also add type parameters to the substitution operation (and reified substitutions) to make sure that as we work with well-typed terms, substitutions stay well-typed.
 
-Note that we won't change the actual code in either the Subst or Simple modules. The implementation of substitution will be exactly the same as before. All of the action will be in the types.
+Note that we won't change the actual code that we developed in  the [Subst](src/Subst.hs) and [Simple](src/Simple.hs) modules. The implementation of substitution will be exactly the same as before. All of the action will be in the types.
 
 In other words, our goal will be to fill in the `???` in the types below to make the types more informative in the [Subst](src/Subst.hs) module (which gives us a general purpose infrastructure for substitution):
 
@@ -70,18 +70,18 @@ instance SubstDB Exp where
 
 ## Strongly-typed AST
 
-In the case of STlC, recall the only two forms of types, base types and function types.
+In the case of STlC, recall that there are only two forms of types, a base type (i.e. Int) and function types.
 
 ```haskell
 data Ty = IntTy | Ty :-> Ty
     deriving (Eq,Show)
 ```
 
-The `Exp` GADT below has two type parameters: 
+The `Exp` datatype below has two type parameters: 
 
 1. The first (of kind `[Ty]`) is a typing context that provides the types of the free variables in the expression.
 
-   With de Bruijn indices, this context can be represented using a *type-level* list of types where the *i-th* type in the list is the type of the *i-th* free variable.
+   With de Bruijn indices, this context can be represented using a *type-level* list of types where the *i-th* type in the list is the type of the *i-th* variable.
 
 2. The second (of kind `Ty`) is the type of the entire expression.
 
@@ -105,7 +105,7 @@ data Exp :: [Ty] -> Ty -> Type where
  -- and an argument of the appropriate type.
 
  LamE   :: STy t1
-        -> Exp (t1:g) t2
+        -> Exp (t1:g) t2        
         -> Exp g (t1 :-> t2)
  -- ^ abstractions (lambda). Includes a runtime
  -- representation of the type of the binder
@@ -113,11 +113,11 @@ data Exp :: [Ty] -> Ty -> Type where
  -- context.
 ```
 
-For lambda expressions, we need to connect the runtime type parameter
+For lambda expressions, we need to connect the runtime type parameter, of type `STy t1` to the type of the variable. We won't go into what this type is or how it works now --- that will have to wait until [Part IV](debruijn4.md).
 
 ### Typed indices
 
-In the last part, we just used natural numbers as our de Bruijn indices. We will do the same here, except that we can give this version of the natural numbers a type that explicitly indicates that they are an index into a (generic) list.
+In [Part I](debruijn1.md), we just used natural numbers as our de Bruijn indices, and (even though we displayed them as integer numberals) we represented them using Peano numbers. We will do the same here, except that we can give this version of the natural numbers a type that explicitly indicates that they are an index into a (generic) list.
 
 ```haskell
 data Idx (g::[a]) (t::a) :: Type where
@@ -168,14 +168,14 @@ data IncBy (g :: [k]) where
    IS :: IncBy n -> IncBy (t:n)
 ```
 
-If we increment by 0, i.e. using `IZ` then our type normalizes to the expected type of the identity substitution. This substitution leaves the context alone. (Haskell can figure out this type for us, but we add it to the source file because that is good style.)
+If we increment by 0, i.e. using `IZ`, then our type normalizes to the expected type of the identity substitution. This substitution leaves the context alone. (Haskell can figure out this type for us, but we add it to the source file because that is good style.)
 
 ```haskell
 -- nil :: Sub a g g
-nil = Inc IZ
+nilSub = Inc IZ
 ```
 
-Similarly, the `lift` and `singleSub` operations have inferrable types. The only change is the adoption of the `IncBy` datatype. (NOTE: if we were in Agda, we could overload the data constructors for `Z` and `S`, but then would not be able to infer the type automatically.)
+Similarly, the `lift` and `singleSub` operations have inferrable types. The only change is the adoption of the `IncBy` datatype. (NOTE: if we were in Agda, we could overload the data constructors for `Z` and `S`, but then would not be able to infer the types automatically.)
 
 ```haskell
 --singleSub :: a g t -> Sub a (t:g) g
@@ -187,7 +187,7 @@ singleSub t = t :< Inc IZ
 lift s = var Z :< (s :<> Inc (IS IZ))
 ```
 
-Finally, when we apply the increment substitution to an index, in the `applyS` function, we need a new type for our natural number addition function. This type reflects the fact that we have shifted the index into the context.
+Finally, when we apply the increment substitution to an index, such as in the `applySub` function, we need a new type for our natural number addition function. This type reflects the fact that we have shifted the index into the context.
 
 ```haskell
 add :: IncBy g1 -> Idx g t -> Idx (g1 ++ g) t
@@ -196,6 +196,30 @@ add (IS xs) i = S (add xs i)
 ```
 
 That is it! We didn't really need to change any code. We only need to add (a lot of) types.
+
+## Stepping lambda-terms (redux) 
+
+Now, we can remove the calls to `error` from our `step` function from before.  In the two cases for unbound variable, 
+GHC's pattern match coverage checker can tell that we don't need to include *any* cases for the indices. Furthermore, the 
+coverage checker also tells us that the case for applying a literal integer is inaccessible. This case cannot happen and 
+we can remove it from the definition.
+
+```haskell
+-- | Small-step evaluation of closed terms.
+step :: Exp '[] t -> Maybe (Exp '[] t)
+step (IntE x)     = Nothing
+step (VarE n)     = case n of {}  -- this case is impossible
+step (LamE t e)   = Nothing
+step (AppE e1 e2) = Just $ stepApp e1 e2 where
+
+    -- Helper function for the AppE case. This function "proves" that we will
+    -- *always* take a step if a closed term is an application expression.
+    stepApp :: Exp '[] (t1 :-> t2) -> Exp '[] t1  -> Exp '[] t2
+    -- stepApp (IntE x)       e2 = error "Type error"
+    stepApp (VarE n)       e2 = case n of {}    
+    stepApp (LamE t e1)    e2 = subst (singleSub e2) e1
+    stepApp (AppE e1' e2') e2 = AppE (stepApp e1' e2') e2
+```
 
 *ADDITIONAL NOTES:*
 

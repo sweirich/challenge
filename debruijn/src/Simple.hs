@@ -57,7 +57,7 @@ reduce (VarE n)   = VarE n
 reduce (LamE t e) = LamE t (reduce e)
 reduce (AppE (LamE t e1) e2) = subst (singleSub (reduce e2)) (reduce e1)
 reduce (AppE (IntE x) e2)    = error "type error" -- don't have to observe this type error, but we can
-reduce (AppE e1 e2)          = AppE (reduce e1) (reduce e2) where
+reduce (AppE e1 e2)          = AppE (reduce e1) (reduce e2) 
 
 -----------------------------------------------------------------------
   

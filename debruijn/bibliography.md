@@ -1,5 +1,7 @@
 # Bibliography
 
+This is a partial list of papers that were influential in the development of this project.
+
 - Benton, Hur, Kennedy, McBride. *Strongly-Typed Term Representations in Coq.* Journal of Automated Reasoning. 2012
 
 This paper is the main inspiration for this work and 
@@ -23,3 +25,7 @@ This impressive paper from 2008 represents several stages of a System F compiler
 - Steven Schäfer, Gert Smolka, Tobias Tebbi *[Completeness and Decidability of de Bruijn Substitution Algebra in Coq](https://dl.acm.org/citation.cfm?id=2693163)* CPP '15
 
 Describes the foundations of the [Autosubst](https://www.ps.uni-saarland.de/Publications/documents/SchaeferEtAl_2015_Autosubst_-Reasoning.pdf) system that uses parallel substitution for de Bruijn indices to support binding in languages represented in the Coq proof assistant. 
+
+- Guillaume Allais, James Chapman, Conor Thomas McBride, James McKinna. *[Type-and-scope safe programs and their proofs](https://dl.acm.org/doi/10.1145/3018610.3018613)*. CPP '17. Agda-based framework for a strongly-typed representation of STLC, with semantic interpretation. Also defines an interface for languages, though in a "finally tagless" style.
+
+- Richard Bird and Ross Paterson. *[De Bruijn Notation as a Nested Datatype](http://www.staff.city.ac.uk/~ross/papers/debruijn.html)*. Journal of Functional Programming, 9(1):77-91, January 1999.  

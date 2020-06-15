@@ -47,7 +47,7 @@ data Sub (a :: ([k] -> k -> Type)) (g :: [k]) (g'::[k]) where
    (:<>) :: Sub a g1 g2 -> Sub a g2 g3 -> Sub a g1 g3 
 
 --nil :: Sub a g g 
-nilSub :: forall a1 (a2 :: [a1] -> a1 -> Type) (g :: [a1]). Sub a2 g g
+nilSub :: forall k (a :: [k] -> k -> Type) (g :: [k]). Sub a g g
 nilSub = Inc IZ
 
 --incSub :: forall t a g. Sub a g (t:g)

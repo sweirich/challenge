@@ -50,9 +50,8 @@ axiom1 :: forall g s. Sing s ->
 axiom1 s = assertEquality
 
 -- We could use quickcheck to convince us, by generating a lot of test cases.
-prop_1 :: Sub Exp -> [Exp] -> Bool
-prop_1 s g = liftList s (incList g) == 
-             incList (map (subst s) g)
+prop_axiom1 :: Sub Exp -> [Exp] -> Bool
+prop_axiom1 s g = map (subst (lift s)) (incList g) == incList (map (subst s) g)
 
 
 -- With effort, we can also check this property at runtime. But this

@@ -20,7 +20,7 @@ This paper uses the [Autosubst](https://www.ps.uni-saarland.de/Publications/docu
 
 - Louis-Julien Guillemette, Stefan Monnier. *[A type-preserving compiler in Haskell](https://dl.acm.org/doi/10.1145/1411203.1411218).* ICFP 2008: 75-86
 
-This impressive paper from 2008 represents several stages of a System F compiler in Haskell, using GADTs, type families and functional dependencies. Polymorphic type variables are represented using de Bruijn indices, but term variables are sometimes expressed using HOAS (for CPS conversion) and sometimes expressed using de Bruijn indices (for closure conversion, and hoisting).
+This impressive paper from 2008 represents several stages of a System F compiler in Haskell, using GADTs, type families and functional dependencies. Polymorphic type variables are represented using de Bruijn indices, but term variables are sometimes expressed using HOAS (for CPS conversion) and sometimes expressed using de Bruijn indices (for closure conversion, and hoisting). Because this is a compiler, the paper only proves that the various transformations are type preserving. It does not define a general substitution operation for System F terms.
 
 - Steven Schäfer, Gert Smolka, Tobias Tebbi *[Completeness and Decidability of de Bruijn Substitution Algebra in Coq](https://dl.acm.org/citation.cfm?id=2693163)* CPP '15
 

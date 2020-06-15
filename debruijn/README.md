@@ -7,7 +7,7 @@ This project demonstrates how to define a strongly-typed term representation for
 The explanation is accompanied by fully worked out example code in this repo. To get started, follow the road map below, paying close attention to the source files referred to in each section.
 
 *Why strongly-typed ASTs?*
-With a strongly-typed term representation, only well-typed terms can be constructed. Language tools that manipulate such data structures can be sure that certain invariants are maintained by the system. For example, the definition of capture-avoiding substitution can be difficult to get correct from scratch. By working with a typed representation, we can be sure that there are no scope-errors in our interpreters, compilers and optimizers and that our transformations are type preserving.
+With a strongly-typed term representation, only well-typed terms can be constructed. That means that language tools that manipulate these data structures must respect the object language type system. For example, the definition of capture-avoiding substitution can be difficult to get correct from scratch. By working with a typed representation, we can be sure that there are no scope-errors in our interpreters, compilers and optimizers and that our transformations are type preserving.
 
 ## Road Map
 
@@ -21,11 +21,12 @@ This development is broken into four main parts, listed below.
 
 - [Part I: Representing binding and substitution using de Bruijn indices](debruijn1.md)
 
-    The first part is a tutorial overview of de Bruijn indices and substitution, culminating in an traditionally typed implementation of the simply-typed lambda  calculus (STLC). If you are new to using de Bruijn indices, this part will walk you through the details and provide a general purpose recipe for a Haskell implementation of binding.  Even if you are not new to de Bruijn indices, you should take a look at this implementation because there are *different* versions of substitution with this representation.
+    The first part is a tutorial overview of de Bruijn indices and substitution, culminating in an implementation of the simply-typed lambda  calculus (STLC). Although there are many 
+    examples of this sort of implementation already, the version presented here introduces a novel interface to substitution, which simplifies the language-specific parts of the implementation. 
 
 - [Part II: Adding strong types to STLC](debruijn2.md)
 
-    Next, we show how to add type indices to the ASTs developed in the previous section to constrain the representation to only well-typed terms of STLC. None of the code changes in this part, just the types.
+    Next, we show how to add type indices to the ASTs developed in the previous section to constrain the representation to only *well-typed* terms of STLC. None of the code changes in this part, just the type annotations.
 
 - Part IIa: Optimized de Bruijn representation  (*Optional part, may be skipped*)
 

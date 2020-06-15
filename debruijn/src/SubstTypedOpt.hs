@@ -1,27 +1,31 @@
 -- | Typed version of the de Bruijn substiution infrastructure
--- This version makes two optimizations:
+-- This version makes two major optimizations:
 --   1. It suspends substiutions at binders (hidden behind a new abstract type)
 --   2. When two subs meet at binder, it combines them with a "smart constructor" for composition
+
 module SubstTypedOpt(
    -- * -- Abstract type for binding locations
-   Bind, bind, unbind, instantiate, substBind, 
+   Bind, bind, unbind, instantiate, substBind,
+   
    -- * -- Substitution class & constructors
    Idx(..), Sub(..), IncBy(..), SubstDB(..), 
    nilSub, incSub, single, comp, 
-   applySub, mapIdx, mapInc, addBy, singIndx
+   applySub, mapIdx, mapInc, addBy, 
  ) where
 
 import qualified Nat (Nat(..),SNat(..),Length,length,LengthSym0)
 import Imports
 import Unsafe.Coerce(unsafeCoerce)
 
--- Binding type ---------
+-- 'Bind' type ---------
 
--- morally "a (t1:g) t2"
--- but may also contain a hidden suspended substitution
+-- When defining an AST, must use this type in the data type definition
+-- to indicate the binding location of a variable.
+-- morally this type is equivalent to "a (t1:g) t2", i.e. an 'a' of type
+-- t2 where the context has been extended with variable t1
 data Bind a t1 g t2 = forall g'. Bind (Sub a g' (t1:g)) (a g' t2)
 
--- introdue a binder
+-- introduce a binder
 bind :: SubstDB a => a (t1:g) t2 -> Bind a t1 g t2
 bind = Bind (Inc IZ)
 {-# INLINABLE bind #-}
@@ -31,12 +35,12 @@ unbind :: SubstDB a => Bind a t1 g t2 -> a (t1:g) t2
 unbind (Bind s a) = subst s a
 {-# INLINABLE unbind #-}
 
--- replace the variable bound at the binder
+-- replace the variable bound at the binder with a term
 instantiate :: SubstDB a => Bind a t1 g t2 -> a g t1 -> a g t2
 instantiate (Bind s a) b = subst (comp s (single b)) a
 {-# INLINABLE instantiate #-}
 
--- apply a substitution to a binder
+-- substitute through the binder
 substBind :: SubstDB a => Sub a g1 g2 -> Bind a t1 g1 t2 -> Bind a t1 g2 t2
 substBind s2 (Bind s1 e) = Bind (comp s1 (lift s2)) e
 {-# INLINABLE substBind #-}
@@ -49,40 +53,16 @@ data Idx (g :: [k]) (t::k) :: Type where
   Z :: Idx (t:g) t
   S :: Idx g t -> Idx (u:g) t
 
--- | "Environment" heterogenous list
--- indexed by a list 
-
-data HList (g :: [k]) where
-  HNil  :: HList '[]
-  HCons :: t -> HList g -> HList (t:g)
-
-
--- Access a list element by its index
--- Never fails, so no need for Maybe
-indx :: HList g -> Idx g t -> t
-indx g Z = case g of 
-   (HCons x xs) -> x
-indx g (S n) = case g of 
-   (HCons x xs) -> indx xs n
-
--- Access a list of Singletons by its index.
--- Never fails, so no need for Maybeß
-singIndx :: Sing g -> Idx g t -> Sing t
-singIndx g Z = case g of
-   (SCons x _) -> x
-singIndx g (S n) = case g of 
-   (SCons _ xs) -> singIndx xs n
-
 -- For increment, we need a proxy that gives us the type of the extended context, 
 -- but is computationally a natural number
 data IncBy (g :: [k]) where
    IZ :: IncBy '[]
    IS :: IncBy n -> IncBy (t:n)
 
-data Sub (a :: ([k] -> k -> Type)) (g :: [k]) (g'::[k]) where
-   Inc   :: IncBy g1 -> Sub a g (g1 ++ g)                 --  weaken the context (shifting all variables over)                
-   (:<)  :: a g' t -> Sub a g g' -> Sub a (t:g) g'        --  extend a substitution (like cons)
-   (:<>) :: Sub a g1 g2 -> Sub a g2 g3 -> Sub a g1 g3 
+data Sub (a :: [k] -> k -> Type) (g :: [k]) (g'::[k]) where
+   Inc   :: IncBy g1 -> Sub a g (g1 ++ g)                 -- weaken the context (shifting all variables over)                
+   (:<)  :: a g' t -> Sub a g g' -> Sub a (t:g) g'        -- extend a substitution (like cons)
+   (:<>) :: Sub a g1 g2 -> Sub a g2 g3 -> Sub a g1 g3     -- composition 
 
 -- | Identity substitution
 nilSub :: Sub a g g 
@@ -92,7 +72,7 @@ nilSub = Inc IZ
 incSub :: forall t a g. Sub a g (t:g)
 incSub = Inc (IS IZ)
 
--- | single substitution for index 0
+-- | Single substitution (for index 0)
 single :: a g t -> Sub a (t:g) g
 single t = t :< nilSub
 
@@ -115,12 +95,13 @@ applySub (ty :< s)     Z  = ty
 applySub (ty :< s)  (S x) = applySub s x
 applySub (s1 :<> s2)   x  = subst s2 (applySub s1 x)
 
---singleSub :: a g t -> Sub a (t:g) g
+singleSub :: a g t -> Sub a (t:g) g
 singleSub t = t :< Inc IZ
 
---lift :: SubstDB a => Sub a g g' -> Sub a (t:g) (t:g')
+lift :: SubstDB a => Sub a g g' -> Sub a (t:g) (t:g')
 lift s = var Z :< (s :<> Inc (IS IZ))
 
+-- | Apply a substitution to the context and type in an Idx
 mapIdx :: forall s g t. Idx g t -> Idx (Map s g) (Apply s t)
 mapIdx Z = Z
 mapIdx (S n) = S (mapIdx @s n)
@@ -137,9 +118,9 @@ addBy :: IncBy g1 -> IncBy g2 -> IncBy (g1 ++ g2)
 addBy IZ      i = i
 addBy (IS xs) i = IS (addBy xs i)
 
+-- | "smart constructor" for substitution. Performs some optimizations
+-- if possible
 comp :: SubstDB a => Sub a g1 g2 -> Sub a g2 g3 -> Sub a g1 g3 
--- comp (Inc (k1 :: IncBy g1)) (Inc (k2 :: IncBy g2)) 
---  | Refl <- assoc @g1 @g2  = Inc (addBy k1 k2)
 comp (Inc IZ) s       = s
 comp (Inc (IS n)) (t :< s) = comp (Inc n) s
 comp s (Inc IZ)   = s
@@ -147,5 +128,3 @@ comp (s1 :<> s2) s3 = comp s1 (comp s2 s3)
 comp (t :< s1) s2 = subst s2 t :< comp s1 s2
 comp s1 s2 = s1 :<> s2
 
--- assoc :: forall g1 g2 g3. g1 ++ (g2 ++ g3) :~: (g1 ++ g2) ++ g3
--- assoc = unsafeCoerce Refl

@@ -2,12 +2,19 @@
 
 ## Introduction
 
-This project demonstrates how to define a strongly-typed term representation for System F terms in GHC using the singletons library.
+This project demonstrates how to define a strongly-typed term representation for System F terms in GHC using the [singletons](https://hackage.haskell.org/package/singletons) library. Along the way it develops several versions of a reusable library for substitution, and explains the technique of using de Bruijn indices to represent variables.
 
-The explanation is accompanied by fully worked out example code in this repo. To get started, follow the road map below, paying close attention to the source files referred to in each section.
+The explanation is accompanied by fully worked out example code. To get started, follow the road map below, paying close attention to the source files referred to in each section.
 
 *Why strongly-typed ASTs?*
-With a strongly-typed term representation, only well-typed terms can be constructed. That means that language tools that manipulate these data structures must respect the object language type system. For example, the definition of capture-avoiding substitution can be difficult to get correct from scratch. By working with a typed representation, we can be sure that there are no scope-errors in our interpreters, compilers and optimizers and that our transformations are type preserving.
+
+With a strongly-typed term representation, only well-typed terms can be
+constructed. That means that language tools that manipulate these data
+structures must respect the object language type system. For example, the
+GHC's type system can show that the definition of capture-avoiding
+substitution preserves the types of the object language. Similarly, other
+operations that manipulate typed terms, such as interpreters, compilers and
+optimizers can be shown type preserving within GHC.
 
 ## Road Map
 
@@ -22,11 +29,11 @@ This development is broken into four main parts, listed below.
 - [Part I: Representing binding and substitution using de Bruijn indices](debruijn1.md)
 
     The first part is a tutorial overview of de Bruijn indices and substitution, culminating in an implementation of the simply-typed lambda  calculus (STLC). Although there are many 
-    examples of this sort of implementation already, the version presented here introduces a novel interface to substitution, which simplifies the language-specific parts of the implementation. 
+    examples of this sort of implementation already, the version presented here introduces a novel, reusable library for substitution, which simplifies the language-specific parts of the implementation. 
 
 - [Part II: Adding strong types to STLC](debruijn2.md)
 
-    Next, we show how to add type indices to the ASTs developed in the previous section to constrain the representation to only *well-typed* terms of STLC. None of the code changes in this part, just the type annotations.
+    Next, we show how to add type indices to the AST developed in the previous section to constrain the representation to only *well-typed* terms of STLC. None of the code changes in this part, just the type annotations in the language definition and in the substitution library.
 
 - Part IIa: Optimized de Bruijn representation  (*Optional part, may be skipped*)
 
@@ -36,11 +43,14 @@ This development is broken into four main parts, listed below.
 
 - [Part III: Untyped ASTs for System F](debruijn3.md)
   
-  Using the substitution infrastructure developed in Part I, we extend our   implementation of STLC to System F. 
+  Using the substitution library developed in Part I, we extend our weakly-typed implementation of STLC to System F. 
 
 - [Part IV: Strongly-typed AST for System F](debruijn4.md)
 
-  Finally, we make a well-typed AST for System F, using both the untyped (for System F types) and typed (for System F terms) substitution infrastructures.
+  Finally, we make a well-typed AST for System F, and define type and term
+  substitution using both the untyped (for System F types) and typed (for
+  System F terms) substitution libraries. This part relies on the use of the
+  singletons library.
 
 - Part IVa: Optimized de Bruijn representation
 
@@ -61,7 +71,7 @@ This development is broken into four main parts, listed below.
 
 ## Requirements
 
-This code requires a recent version of singletons (2.6) to compile, which itself requires GHC 8.8. Earlier compilers and versions of the library will not work. For convenience, we suggest that you compile using the `stack` tool, which will automatically download and install the correct version of the compiler and librarie.
+This code requires a recent version of singletons (2.6) to compile, which itself requires GHC 8.8. Earlier compilers and versions of the library will not work. For convenience, we suggest that you compile using the `stack` tool, which will automatically download and install the correct version of the compiler and libraries.
 
 ## Disclaimer
 

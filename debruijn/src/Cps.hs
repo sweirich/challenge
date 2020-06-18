@@ -22,6 +22,7 @@ $(singletons [d|
 
 
 
+
 -- | Access a runtime version of the type
 -- of a (well-typed) expression
 typeOf :: Sing g -> Exp g t -> Sing t
@@ -84,6 +85,18 @@ sContTy t = sCpsTy t :%->  sVoidTy
 sCpsList :: Sing ts -> Sing (CpsList ts)
 sCpsList SNil = SNil
 sCpsList (SCons t ts) = SCons (sCpsTy t) (sCpsList ts)
+
+--------------------------------------------------------
+
+type family CpsSub (s :: U.Sub Ty) where
+    CpsSub (U.Inc k)     = U.Inc k
+    CpsSub (t U.:< s)    = CpsTy t U.:< CpsSub s
+    CpsSub (s1 U.:<> s2) = CpsSub s1 U.:<> CpsSub s2
+
+cpsSub :: U.Sub Ty -> U.Sub Ty
+cpsSub (U.Inc k)     = U.Inc k
+cpsSub (t U.:< s)    = cpsTy t U.:< cpsSub s
+cpsSub (s1 U.:<> s2) = cpsSub s1 U.:<> cpsSub s2
 
 --------------------------------------------------------
 
@@ -184,10 +197,10 @@ cpsExp g (AppE e1 e2)  k =
      in
        cpsExp g e1 k1
  
-cpsExp (g :: CpsCtx g g') (TyApp e1 (ty :: Sing ty)) k =
+cpsExp (g :: CpsCtx g g') (TyApp e1 (ty :: Sing (ty :: Ty))) k =
   case typeOf (fstCtx g) e1 of
     SPolyTy (t1 :: Sing t1)
-      | Refl <- cpsCommutes2 @ty @t1
+      | Refl <- cpsCommutes @t1 @(U.SingleSub ty)
       -> 
         let 
           k1 :: Cont g' (CpsTy (PolyTy t1))
@@ -203,24 +216,15 @@ cpsExp (g :: CpsCtx g g') (TyApp e1 (ty :: Sing ty)) k =
         in
           cpsExp g e1 k1
 
-cpsCommutes :: forall ty.
-             CpsTy (U.Subst U.IncSub ty) :~: U.Subst U.IncSub (CpsTy ty)
+
+
+cpsCommutes :: forall ty (s :: U.Sub Ty).
+             CpsTy (U.Subst s ty) :~: U.Subst (CpsSub s) (CpsTy ty)
 cpsCommutes = assertEquality
 
-
 -- Justification for axiom above using quickCheck
-cps_commutes ty =
-   cpsTy (U.subst U.incSub ty) == U.subst U.incSub (cpsTy ty)
-
-cpsCommutes2 :: forall ty1 ty.
-             CpsTy (U.Subst (U.SingleSub ty1) ty) :~:
-             U.Subst (U.SingleSub (CpsTy ty1)) (CpsTy ty)
-cpsCommutes2 = assertEquality
-
--- Justification for axiom above using QuickCheck
-cps_commutes2 tys ty =
-   cpsTy (U.subst (U.singleSub tys) ty) == U.subst (U.singleSub (cpsTy tys)) (cpsTy ty)
-
+prop_cpsCommutes ty s =
+   cpsTy (U.subst s ty) == U.subst (cpsSub s) (cpsTy ty)
 
 
 sIncCpsCtx  :: forall n g g'.
@@ -228,15 +232,15 @@ sIncCpsCtx  :: forall n g g'.
             -> CpsCtx (IncList g) (IncList g')
 sIncCpsCtx CpsStart = CpsStart
 sIncCpsCtx (CpsLamE (t1 :: Sing t1) (t2 :: p t2) g)
-  | Refl <- cpsCommutes @t1
-  , Refl <- cpsCommutes @t2
+  | Refl <- cpsCommutes @t1 @U.IncSub
+  , Refl <- cpsCommutes @t2 @U.IncSub
   = CpsLamE (U.sSubst U.sIncSub t1)
      (Proxy :: Proxy (U.Subst U.IncSub t2)) (sIncCpsCtx g)
 sIncCpsCtx (CpsMetaE (t1 :: Sing t1) g)
-  | Refl <- cpsCommutes @t1
+  | Refl <- cpsCommutes @t1 @U.IncSub
   = CpsMetaE (U.sSubst U.sIncSub t1) (sIncCpsCtx g)
 sIncCpsCtx (CpsTyLam (t1 :: Sing t1) g)
-  | Refl <- cpsCommutes @t1
+  | Refl <- cpsCommutes @t1 @U.IncSub
   = CpsTyLam (U.sSubst U.sIncSub t1) (sIncCpsCtx g)
 
 fstCtx :: CpsCtx g g' -> Sing g

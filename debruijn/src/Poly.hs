@@ -4,6 +4,7 @@ module Poly where
 import Imports
 import Nat
 import Subst
+import Test.QuickCheck
 
 $(singletons [d|
 
@@ -38,6 +39,7 @@ data Exp :: Type where
  TyApp  :: Exp      -- type function
         -> Ty       -- type argument
         -> Exp
+    deriving (Eq, Show)
 
 -- Example, the polymorphic identity function
 polyId :: Exp 
@@ -145,3 +147,44 @@ typeCheck g (TyApp e ty) = do
   case ty0 of
     PolyTy ty1 -> Just (subst (singleSub ty) ty1)
     _ -> Nothing
+
+
+-------------------------------------------------------------------
+
+instance Arbitrary Ty where
+  arbitrary = sized gt where
+   base = oneof [VarTy <$> arbitrary, return IntTy]
+   gt m =
+     if m <= 1 then base else
+     let m' = m `div` 2 in
+     frequency
+     [(1, base),
+      (1, (:->) <$> gt m' <*> gt m'),
+      (1, PolyTy    <$>  gt m')]
+
+  shrink IntTy       = []
+  shrink (VarTy n)   = [VarTy n' | n' <- shrink n ]
+  shrink (PolyTy s)  = s : [ PolyTy s' | s' <- shrink s]
+  shrink (t1 :-> t2) = t1 : t2 : [t1' :-> t2 | t1' <- shrink t1] ++ [t1 :-> t2' | t2' <- shrink t2]
+
+
+instance Arbitrary Exp where
+  arbitrary = sized gt where
+   base = oneof [VarE <$> arbitrary]
+   gt m =
+     if m <= 1 then base else
+     let m' = m `div` 2 in
+     frequency
+     [(1, base),
+      (1, AppE    <$> gt m' <*> gt m'),
+      (1, LamE    <$> arbitrary <*> gt m'),
+      (1, TyLam   <$> gt m'),
+      (1, TyApp   <$> gt m' <*> arbitrary)]
+
+  shrink (IntE _)      = []
+  shrink (VarE n)      = [VarE n' | n' <- shrink n ]
+  shrink (LamE t s)    = s : [ LamE t s' | s' <- shrink s] ++ [ LamE t' s | t' <- shrink t]
+  shrink (AppE t1 t2)  = t1 : t2 : [AppE t1' t2 | t1' <- shrink t1] ++ [AppE t1 t2' | t2' <- shrink t2]
+  shrink (TyLam s)     = s : [ TyLam s' | s' <- shrink s]  
+  shrink (TyApp t1 t2) = t1 : [TyApp t1' t2 | t1' <- shrink t1] ++ [TyApp t1 t2' | t2' <- shrink t2]
+

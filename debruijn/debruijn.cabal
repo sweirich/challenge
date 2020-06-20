@@ -25,6 +25,7 @@ library
                        SimpleTyped
                        SimpleTypedOpt
                        Poly
+                       PolyScoped
                        PolyTyped
                        PolyTypedOpt
                        Cps

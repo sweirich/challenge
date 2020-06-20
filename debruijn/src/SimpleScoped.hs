@@ -1,18 +1,16 @@
-
+-- | A "scope-safe" interpreter for the simply-typed lambda calculus
 module SimpleScoped where
 
 import Imports
 import Nat
 import SubstScoped
 
--- Syntax of Simply-Typed Lambda Calculus (STLC) types
-
+-- | Syntax of Simply-Typed Lambda Calculus (STLC) types
 data Ty = IntTy | Ty :-> Ty
   deriving (Eq, Show)
 
--- Syntax of STLC expressions, using GADT to track the scope
--- of the variables in terms
-
+-- | Syntax of STLC expressions, using GADT to track the scope
+--  of the variables in terms
 data Exp :: Nat -> Type where
   IntE   :: Int      -- literal ints
          -> Exp n

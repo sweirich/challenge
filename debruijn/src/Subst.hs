@@ -45,7 +45,7 @@ $(singletons [d|
     nilSub :: Sub a 
     nilSub = Inc Z
 
-    -- increment, shifts all variable by one
+    -- increment, shifts all variables by one
     incSub :: Sub a 
     incSub = Inc (S Z) 
 

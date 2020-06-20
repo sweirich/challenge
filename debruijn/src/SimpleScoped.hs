@@ -42,30 +42,35 @@ instance SubstDB Exp where
    subst s (LamE ty e)  = LamE ty (subst (lift s) e)
    subst s (AppE e1 e2) = AppE (subst s e1) (subst s e2)
 
--- * Examples of some operations defined using this representation.
+-----------------------------------------------------------------------
+-- Examples
 
--- | is an expression a value?
-value :: Exp n -> Bool
-value (IntE x)   = True
-value (LamE t e) = True
-value _          = False
-
--- | Small-step evaluation
+-- | Small-step evaluation of closed terms.
+-- 
+-- Either return the next term or Nothing, if the term is already a value.
+-- In a closed term, the scope is 'Z', because there are zero free variables.
 step :: Exp Z -> Maybe (Exp Z)
-step (IntE x)   = Nothing
-step (VarE n)   = case n of {}   -- cannot have a scope error any more
-step (LamE t e) = Nothing
-step (AppE (LamE t e1) e2)   = Just $ subst (singleSub e2) e1
-step (AppE (IntE _) e2)      = error "Type error!"
-step (AppE e1 e2) = do e1' <- step e1
-                       return $ AppE e1' e2
+step (IntE x)     = Nothing
+step (VarE n)     = case n of {}
+step (LamE t e)   = Nothing
+step (AppE e1 e2) = Just $ stepApp e1 e2 where
 
--- | open reduction
+    stepApp :: Exp Z -> Exp Z  -> Exp Z
+    stepApp (IntE x)       e2 = error "Type error"
+    stepApp (VarE n)       e2 = case n of {}    
+    stepApp (LamE t e1)    e2 = subst (singleSub e2) e1
+    stepApp (AppE e1' e2') e2 = AppE (stepApp e1' e2') e2
+
+
+-- | Reduce open expressions to their normal form
 reduce :: Exp n -> Exp n
 reduce (IntE x)   = IntE x
 reduce (VarE n)   = VarE n
 reduce (LamE t e) = LamE t (reduce e)
 reduce (AppE (LamE t e1) e2)   = subst (singleSub (reduce e2)) (reduce e1)
-reduce (AppE (IntE x) e2) = error "Type error!"
+reduce (AppE (IntE x)    e2)   = error "Type error!"
 reduce (AppE e1 e2) = AppE (reduce e1) (reduce e2)
+
+
+
 

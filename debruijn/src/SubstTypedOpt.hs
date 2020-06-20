@@ -15,32 +15,32 @@ module SubstTypedOpt(
 
 import qualified Nat (Nat(..),SNat(..),Length,length,LengthSym0)
 import Imports
-import Unsafe.Coerce(unsafeCoerce)
+
 
 -- 'Bind' type ---------
 
--- When defining an AST, must use this type in the data type definition
+-- | When defining an AST, use this type in the data type definition
 -- to indicate the binding location of a variable.
--- morally this type is equivalent to "a (t1:g) t2", i.e. an 'a' of type
--- t2 where the context has been extended with variable t1
+-- Morally this type is equivalent to "a (t1:g) t2", i.e. an 'a' of type
+-- t2 where the context 'g' has been extended with variable t1
 data Bind a t1 g t2 = forall g'. Bind (Sub a g' (t1:g)) (a g' t2)
 
--- introduce a binder
+-- | introduce a binder
 bind :: SubstDB a => a (t1:g) t2 -> Bind a t1 g t2
 bind = Bind (Inc IZ)
 {-# INLINABLE bind #-}
 
--- expose the body of the binder
+-- | expose the body of the binder
 unbind :: SubstDB a => Bind a t1 g t2 -> a (t1:g) t2
 unbind (Bind s a) = subst s a
 {-# INLINABLE unbind #-}
 
--- replace the variable bound at the binder with a term
+-- | replace the variable bound at the binder with a term
 instantiate :: SubstDB a => Bind a t1 g t2 -> a g t1 -> a g t2
 instantiate (Bind s a) b = subst (comp s (single b)) a
 {-# INLINABLE instantiate #-}
 
--- substitute through the binder
+-- | substitute through the binder
 substBind :: SubstDB a => Sub a g1 g2 -> Bind a t1 g1 t2 -> Bind a t1 g2 t2
 substBind s2 (Bind s1 e) = Bind (comp s1 (lift s2)) e
 {-# INLINABLE substBind #-}
@@ -51,18 +51,18 @@ substBind s2 (Bind s1 e) = Bind (comp s1 (lift s2)) e
 -- This type is isomorphic to the natural numbers
 data Idx (g :: [k]) (t::k) :: Type where
   Z :: Idx (t:g) t
-  S :: Idx g t -> Idx (u:g) t
+  S :: !(Idx g t) -> Idx (u:g) t
 
 -- For increment, we need a proxy that gives us the type of the extended context, 
 -- but is computationally a natural number
 data IncBy (g :: [k]) where
    IZ :: IncBy '[]
-   IS :: IncBy n -> IncBy (t:n)
+   IS :: !(IncBy n) -> IncBy (t:n)
 
 data Sub (a :: [k] -> k -> Type) (g :: [k]) (g'::[k]) where
-   Inc   :: IncBy g1 -> Sub a g (g1 ++ g)                 -- weaken the context (shifting all variables over)                
-   (:<)  :: a g' t -> Sub a g g' -> Sub a (t:g) g'        -- extend a substitution (like cons)
-   (:<>) :: Sub a g1 g2 -> Sub a g2 g3 -> Sub a g1 g3     -- composition 
+   Inc   :: !(IncBy g1) -> Sub a g (g1 ++ g)                 -- weaken the context (shifting all variables over)                
+   (:<)  :: a g' t -> !(Sub a g g') -> Sub a (t:g) g'        -- extend a substitution (like cons)
+   (:<>) :: !(Sub a g1 g2) -> !(Sub a g2 g3) -> Sub a g1 g3     -- composition 
 
 -- | Identity substitution
 nilSub :: Sub a g g 

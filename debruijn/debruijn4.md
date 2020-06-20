@@ -268,6 +268,3 @@ That sounds scary, but that is actually the approach taken in the implementation
 This approach is really an enhanced version of the one above. If we are *very* confident in the correctness of properties like the one above, we can allow experts to develop a type-checker plug-in that captures this sort of reasoning. This version isn't any more safe than the previous (a GHC plug-in is simply a way to tell the typechecker about a LOT of axioms) but it does establish the boundaries of what may and may not be assumed.
 
 
-## Conclusion
-
-The example, demonstrates what works and does not work with dependently-typed programming in GHC. 

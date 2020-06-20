@@ -45,8 +45,8 @@ instance SubstDB Exp where
 -- Here is a property that we need about our substitution function.
 -- Why should we believe it? Note that if we are *wrong* about this property
 -- we could break Haskell.
-axiom1 :: forall g s. Sing s ->
-          LiftList s (IncList g) :~: IncList (Map (SubstSym1 s) g)
+axiom1 :: forall env sub. Sing sub ->
+          LiftList sub (IncList env) :~: IncList (Map (SubstSym1 sub) env)
 axiom1 s = assertEquality
 
 -- We could use quickcheck to convince us, by generating a lot of test cases.
@@ -67,15 +67,54 @@ check1 g s =
   (sIncList (sMap (SLambda @_ @_ @(SubstSym1 s) (sSubst s)) g))
   
 
+{-
+
+NOTE: this axiom corresponds to the following lemma from Benton et al.
+which is stated as:
+
+Lemma STyExp_cast2 : ∀ u w (sub:SubT u w) (env:Env u) (ty:Ty (S u)),
+@eq Type
+(Exp (STyE (STyL sub) (STyE (shSubT u) env)) (STyT (STyL sub) ty))
+(Exp (STyE (shSubT _) (STyE sub env))        (STyT (STyL sub) ty)).
+
+
+where
+  STyE (STyL sub) (STyE (shSubT u) env)   ==   LiftList sub (IncList env)
+
+and
+  STyE (shSubT _) (STyE sub env)          ==   IncList (Map (SubstSym1 sub) env)
+
+-}
 -------------------------------------------------------------------
 
 prop_2 :: Sub Exp -> Exp -> Exp -> Bool
 prop_2 s t2 x = subst s (subst (singleSub t2) x) == subst (singleSub (subst s t2)) (subst (lift s) x)
 
-axiom2 :: forall t1 t2 s . Sing s ->
-             Subst s (Subst (SingleSub t2) t1) :~: Subst (SingleSub (Subst s t2)) (Subst (Lift s) t1)
+axiom2 :: forall ty ty' sub . Sing sub ->
+             Subst sub (Subst (SingleSub ty') ty) :~: Subst (SingleSub (Subst sub ty')) (Subst (Lift sub) ty)
 axiom2 s = assertEquality
 
+
+{-
+
+NOTE: this axiom corresponds to the following lemma from Benton et al.
+which is stated as:
+
+Lemma STyExp_cast1 : ∀ u w (sub: SubT u w) (env: Env u)
+(ty : Ty (S u)) (ty’ : Ty u),
+@eq Type
+(Exp (STyE sub env) (STyT [| STyT sub ty’ |] (STyT (STyL sub) ty)))
+(Exp (STyE sub env) (STyT sub (STyT [| ty’ |] ty))).
+
+STyT sub (STyT [| ty’ |] ty)  == Subst sub (Subst (SingleSub ty') ty)
+
+STyT [| STyT sub ty’ |] (STyT (STyL sub) ty) == Subst (SingleSub (Subst sub ty')) (Subst (Lift sub) ty)
+
+
+
+-}
+
+-----------------------------------------------------------------------------
 prop_3 :: Sub Exp -> Sub Exp -> [Exp] -> Bool
 prop_3 s1 s2 g = map (subst s2) (map (subst s1) g) == map (subst (s1 <> s2)) g
 
@@ -93,6 +132,8 @@ prop_5 g = map (subst (Inc Z)) g == g
 
 axiom5 :: forall g. Map (SubstSym1 (Inc Z)) g :~: g
 axiom5 = assertEquality
+
+-- This property is needed to implement open reduction for the polymorphic lambda terms.
 
 axiom6 :: forall t g . Map (SubstSym1 (t ':< 'Inc 'Z)) (Map (SubstSym1 ('Inc ('S 'Z))) g) :~: g
 axiom6
@@ -125,7 +166,6 @@ prop_id x = subst nilSub x == x
 
 prop_comp :: Sub Exp -> Sub Exp -> Exp -> Bool
 prop_comp s1 s2 x = subst s2 (subst s1 x) == subst (s1 <> s2) x
-
 
 -------------------------------------------------------------------
 -- Properties about lists (maybe these belong in another file?)

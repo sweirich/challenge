@@ -82,3 +82,10 @@ typeCheck g (AppE e1 e2) = do
 -- \(x :: Int) -> \(y :: Int) -> x
 example1 :: Exp 
 example1 = LamE IntTy (LamE IntTy (VarE 1))
+
+
+-- \x -> x (\y -> x y)
+-- NOTE, this doesn't typecheck in STLC, but we can represent it
+example2 :: Exp
+example2 = LamE (IntTy :-> IntTy) 
+    (AppE (VarE 0) (LamE IntTy (AppE (VarE 1) (VarE 0))))

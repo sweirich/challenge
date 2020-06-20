@@ -12,7 +12,7 @@ Simply-Typed Lambda Calculus with integer constants.
 ```haskell
 type Idx = Nat -- an index is just a natural number.
 
-data Ty = IntTy | Ty :-> Ty   -- s
+data Ty = IntTy | Ty :-> Ty   
 
 data Exp = IntE Int | VarE Idx | LamE Exp | AppE Exp Exp
 ```
@@ -42,7 +42,7 @@ While *representing* terms using indices is not so difficult, things get a bit m
 
 Consider a beta-reduction for a lambda calculus expression `(\ x -> M) N`. To reduce this term, we need to substitute, i.e. we need some substitution function, sometimes written `[x |-> N]M`. But what is the definition of this operation when variables are represented as indices?
 
-With de Bruijn indices, the substitution operation must do *three* things [1]:
+With de Bruijn indices, the substitution operation must do *three* things [^1]:
 
 1. Find all occurrences of `x` in `M` and replace them by `N`. These occurrences start out as `Var 0` but as the operation traverses under binders, the index corresponding to `x` increases.
 
@@ -148,7 +148,7 @@ class SubstDB a where
    subst :: Sub a -> a -> a
 ```
 
-and then instantiate this class with each datatype with binding[2].
+and then instantiate this class with each datatype with binding [^2].
 
 ```haskell
 instance SubstDB Exp where
@@ -185,6 +185,6 @@ step (AppE e1 e2) = Just $ stepApp e1 e2 where
 
 NOTES
 
-[1]: Occasionally, we can work in a setting where we don't need to worry about one or two of these issues. For example, if we only need to model a small-step operational semantics for closed terms, we don't need to worry about variable capture during substitution and can ignore (2). Alternatively, if we use a locally-nameless representation, we never substitute into terms with free variables represented by indices, so we can ignore (3).
+[^1]: Occasionally, we can work in a setting where we don't need to worry about one or two of these issues. For example, if we only need to model a small-step operational semantics for closed terms, we don't need to worry about variable capture during substitution and can ignore (2). Alternatively, if we use a locally-nameless representation, we never substitute into terms with free variables represented by indices, so we can ignore (3).
 
-[2]: We could also use generic programming to automatically derive the definition of `subst`, using techniques such as in the `Unbound` library.
+[^2]: We could also use generic programming to automatically derive the definition of `subst`, using techniques such as in the `Unbound` library.

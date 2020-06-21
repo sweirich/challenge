@@ -94,7 +94,7 @@ substTy s (TyApp (e :: Exp g (PolyTy t1)) (t :: STy t2))
 
 -- | Increment all types in a term substitution
 -- Need to know that IncList ~ Map (SubstSym1 IncSub)
-incTy :: forall s g g'. S.Sub Exp g g'
+incTy :: forall g g'. S.Sub Exp g g'
       -> S.Sub Exp (IncList g) (IncList g')
 incTy (S.Inc (x :: S.IncBy g1)) 
   | Refl <- axiom_map1 @(W.SubstSym1 W.IncSub) @g1 @g

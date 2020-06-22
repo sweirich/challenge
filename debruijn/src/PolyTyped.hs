@@ -134,6 +134,32 @@ stepTyApp (AppE e1' e2') t1 = TyApp (stepApp e1' e2') t1
 stepTyApp (TyLam e1)     t1 = substTy (W.sSingleSub t1) e1
 stepTyApp (TyApp e1 t2)  t1 = TyApp (stepTyApp e1 t2) t1
 
+
+-- | Big-step evaluation of closed terms
+-- To do this correctly, we need to define a separate type
+-- for values. 
+data Val :: [Ty] -> Ty -> Type where
+  IntV :: Int -> Val g IntTy
+  LamV :: Π (t1 :: Ty)          -- type of binder
+        -> Exp (t1:g) t2        -- body of abstraction
+        -> Val g (t1 :-> t2)
+  TyLamV :: Exp (IncList g) t   -- bind a type variable
+         -> Val g (PolyTy t)
+
+eval :: Exp '[] t -> Val '[] t
+eval (IntE x) = IntV x
+eval (VarE n) = case n of {}
+eval (LamE t e) = LamV t e
+eval (AppE e1 e2) =
+  case eval e1 of
+    (LamV t e1') -> eval (S.subst (S.singleSub e2) e1')
+eval (TyLam e) = TyLamV e
+eval (TyApp e1 t) =
+  case eval e1 of
+    (TyLamV e1') -> eval (substTy (W.sSingleSub t) e1')
+
+
+
 -- | open reduction
 reduce :: forall g t. Exp g t -> Exp g t
 reduce (IntE x)   = IntE x

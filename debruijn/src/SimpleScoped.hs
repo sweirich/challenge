@@ -60,6 +60,25 @@ step (AppE e1 e2) = Just $ stepApp e1 e2 where
     stepApp (AppE e1' e2') e2 = AppE (stepApp e1' e2') e2
 
 
+-- | Big-step evaluation of closed terms
+-- To do this correctly, we need to define a separate type
+-- for values. 
+data Val :: Nat -> Type where
+  IntV :: Int -> Val n
+  LamV :: Ty
+        -> Exp (S n)        -- body of abstraction
+        -> Val n
+
+eval :: Exp Z -> Val Z
+eval (IntE x) = IntV x
+eval (VarE n) = case n of {}
+eval (LamE t e) = LamV t e
+eval (AppE e1 e2) =
+  case eval e1 of
+    (IntV x) -> error "Type error"
+    (LamV t e1') -> eval (subst (singleSub e2) e1')
+
+
 -- | Reduce open expressions to their normal form
 reduce :: Exp n -> Exp n
 reduce (IntE x)   = IntE x

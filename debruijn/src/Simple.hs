@@ -41,7 +41,7 @@ instance SubstDB Exp where
 -- | Small-step evaluation
 step :: Exp -> Maybe Exp
 step (IntE x)     = Nothing
-step (VarE n)     = error "Unbound Variable"
+step (VarE n)     = error "Unbound variable"
 step (LamE t e)   = Nothing
 step (AppE e1 e2) = Just $ stepApp e1 e2 where
    stepApp :: Exp -> Exp -> Exp 
@@ -49,8 +49,25 @@ step (AppE e1 e2) = Just $ stepApp e1 e2 where
    stepApp (VarE n)       e2 = error "Unbound variable"
    stepApp (LamE t e1)    e2 = subst (singleSub e2) e1
    stepApp (AppE e1' e2') e2 = AppE (stepApp e1' e2') e2
-                       
--- | open reduction
+
+-- | Big-step evaluation of closed terms
+-- To do this correctly, we need to define a separate type
+-- for values. 
+data Val :: Type where
+  IntV :: Int -> Val
+  LamV :: Ty -> Exp -> Val
+
+eval :: Exp -> Val 
+eval (IntE x)     = IntV x
+eval (VarE _)     = error "Unbound variable"
+eval (LamE t e)   = LamV t e
+eval (AppE e1 e2) =
+  case eval e1 of
+    (IntV _) -> error "Type error"
+    (LamV t e1') -> eval (subst (singleSub e2) e1')
+    
+                               
+-- | Open reduction (under lambda expressions)
 reduce :: Exp -> Exp
 reduce (IntE x)   = IntE x
 reduce (VarE n)   = VarE n

@@ -56,6 +56,22 @@ step (AppE e1 e2) = Just $ stepApp e1 e2 where
     stepApp (LamE t e1)    e2 = subst (singleSub e2) e1
     stepApp (AppE e1' e2') e2 = AppE (stepApp e1' e2') e2
 
+-- | Big-step evaluation of closed terms
+-- To do this correctly, we need to define a separate type
+-- for values. 
+data Val :: [Ty] -> Ty -> Type where
+  IntV :: Int -> Val g IntTy
+  LamV :: Π (t1 :: Ty)          -- type of binder
+        -> Exp (t1:g) t2        -- body of abstraction
+        -> Val g (t1 :-> t2)
+
+eval :: Exp '[] t -> Val '[] t
+eval (IntE x) = IntV x
+eval (VarE n) = case n of {}
+eval (LamE t e) = LamV t e
+eval (AppE e1 e2) =
+  case eval e1 of
+    (LamV t e1') -> eval (subst (singleSub e2) e1')
 
 -- | Reduce open expressions to their normal form
 reduce :: Exp g t -> Exp g t

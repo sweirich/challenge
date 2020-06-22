@@ -1,7 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -fwarn-incomplete-patterns -Wno-redundant-constraints #-}
 -- | A simple module of natural numbers (with associated singletons)
-module Nat (
+module Nat {- (
   -- * Nat type, its singleton, and symbols
   Nat(..),SNat(..),SSym0,ZSym0,Sing(..),
 
@@ -20,11 +20,13 @@ module Nat (
   indx, Indx, sIndx, IndxSym0,
 
 
-) where
+) -} where
 
 import Prelude hiding ((!!), take, drop, length)
 import Imports hiding (length, Length, sLength, LengthSym0)
 import Test.QuickCheck((==>),Property,Arbitrary(..),oneof)
+import Data.Singletons.TH.Options
+import Control.Monad.Trans.Class(lift)
 
 $(singletons [d|
     data Nat = Z | S Nat deriving (Eq,Ord)

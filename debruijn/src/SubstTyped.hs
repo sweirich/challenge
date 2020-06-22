@@ -12,8 +12,7 @@ data Idx (g :: [k]) (t::k) :: Type where
 
 -- | "Environment" heterogenous list
 -- indexed by a list 
-
-data HList (g :: [k]) where
+data HList :: forall k. [k] -> Type where
   HNil  :: HList '[]
   HCons :: t -> HList g -> HList (t:g)
 

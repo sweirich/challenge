@@ -50,6 +50,13 @@ polymorphism) to represent System F. Although GHC has such kind polymorphism,
 the lack of anonymous functions in the type level makes this sort of
 representation difficult to work with in GHC.
 
+- James Chapman, Roman Kireev, Chad Nester, and Philip Wadler. *[System F in Agda, for fun and profit](https://files.zotero.net/eyJleHBpcmVzIjoxNTkyODQ5NjIzLCJoYXNoIjoiNTlkODRjZDU5YmQ2M2E2NTVjMDhiM2VhNTdlYmM3NmQiLCJjb250ZW50VHlwZSI6ImFwcGxpY2F0aW9uXC9wZGYiLCJjaGFyc2V0IjoiIiwiZmlsZW5hbWUiOiJDaGFwbWFuIGV0IGFsLiAtIDIwMTkgLSBTeXN0ZW0gRiBpbiBBZ2RhLCBmb3IgZnVuIGFuZCBwcm9maXQucGRmIn0%3D/1eaedb49fe3b8c3b8247ece24aca96db1f70cf460feb6404c1efb7ac627e2c5a/Chapman%20et%20al.%20-%202019%20-%20System%20F%20in%20Agda%2C%20for%20fun%20and%20profit.pdf). MPC 2019: Mathematics of Program Construction pp 255-297.
+
+A well-typed representation of System F-omega using the Agda proof assistant. 
+
+- Carsten Schürmann, Dachuan Yu, Zhaozhong Ni. *[A Representation of Fomega in LF](https://www.itu.dk/people/carsten/papers/safeIL.ps.gz)*. Electronic Notes in Theoretical Computer Science. Vol 58, No.1. 2001.
+
+A well-typed representation of System F-omega using the Twelf proof assistant. 
 
 ## Frameworks, tools, techniques and libraries for working with de Bruijn indices
 

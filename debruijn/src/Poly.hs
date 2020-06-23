@@ -27,21 +27,28 @@ $(singletons [d|
 -- | An AST for System F
 -- Adds data constructors for type abstraction and type application
 data Exp :: Type where
+
  IntE   :: Int
         -> Exp
+
  VarE   :: Idx
         -> Exp 
+
  LamE   :: Ty       -- type of binder
         -> Exp      -- body of abstraction
         -> Exp          
+
  AppE   :: Exp      -- function
         -> Exp      -- argument
         -> Exp 
+
  TyLam  :: Exp      -- bind a type variable
         -> Exp
+
  TyApp  :: Exp      -- type function
         -> Ty       -- type argument
         -> Exp
+
     deriving (Eq, Show)
 
 -- Example, the polymorphic identity function

@@ -17,7 +17,7 @@ structures must respect the object language type system. For example, GHC's
 type system can show that the definition of capture-avoiding substitution
 preserves the types of the object language; ruling out certain sorts of
 bugs. Similarly, other operations that manipulate typed terms, such as
-interpreters, compilers and optimizers can be shown type preserving by
+interpreters, compilers and optimizers can be shown type-preserving by
 implementing them using this representation in GHC.
 
 ### Chalmers Seminar video
@@ -56,7 +56,7 @@ This development is broken into four main parts, listed below.
 - [Part IV: Strongly-typed AST for System F](debruijn4.md)
 
   Finally, we make a well-typed AST for System F, and define type and term
-  substitution using both the untyped (for System F types) and typed (for
+  substitution using both the weakly-typed (for System F types) and strongly-typed (for
   System F terms) substitution libraries. This part relies on the use of the
   singletons library.
 
@@ -70,9 +70,9 @@ This development is broken into four main parts, listed below.
   
   If you'd like to go deeper, there are several additional examples of operations that use the [PolyTyped](src/PolyTyped.hs) System F representation developed in Part IV.
 
-  - [TypeCheck](src/TypeCheck.hs): A type checker that translates the untyped AST to the typed AST (or fails if the term does not type check).
+  - [TypeCheck](src/TypeCheck.hs): A type checker that translates the weakly-typed AST to the strongly-typed AST (or fails if the term does not type check).
   - [CPS](src/Cps.hs): CPS-conversion algorithm for the strongly-typed System F. The type indices show that this 
-  transformation is type preserving. 
+  transformation is type-preserving.
   - [SubstScoped](src/SubstScoped.hs) and [SimpleScoped](src/SimpleScoped): Just keep track of scopes, not types
 
 - [Bibliography](bibliography.md): Sources and related work. This tutorial is

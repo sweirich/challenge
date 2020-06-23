@@ -6,7 +6,7 @@
 
 This entire development is based on a de Bruijn representation of variables. What this means is that variables are represented by *indices* that count enclosing binders, i.e. natural numbers.
 
-For example, consider these data type definitions for the 
+For example, consider these datatype definitions for the
 Simply-Typed Lambda Calculus with integer constants.
 
 ```haskell
@@ -19,14 +19,16 @@ data Exp = IntE Int | VarE Idx | LamE Exp | AppE Exp Exp
 
 Then the lambda calculus expression 
 
-```\(x :: Int) (y :: Int) -> x``` 
+```
+\(x :: Int) (y :: Int) -> x
+```
 
 can be represented with the Haskell expression
 
 ```haskell
 LamE IntTy (LamE IntTy (VarE 1))
 ```
-showing that the variable inside the term resolves to not the closest enclosing lambda (index 0) but the next one (index 1).
+showing that the variable inside the term resolves to not the closest enclosing lambda (index `0`) but the next one (index `1`).
 
 Similarly, the lambda calculus expression `\(x :: t1) -> (\(y :: t2) -> x y) x` can be represented with the expression
 
@@ -118,7 +120,7 @@ lift s = Var 0 `cons` (s <> incSub 1)
 
 ### Defunctionalized substitutions
 
-The narrative above describes *everything* that we want to do with substitutions. That means that we don't need to use functions to represent substitutions; instead we can "defunctionalize" our three primitive substitution operations and use a data type to represent them.
+The narrative above describes *everything* that we want to do with substitutions. That means that we don't need to use functions to represent substitutions; instead we can "defunctionalize" our three primitive substitution operations and use a datatype to represent them.
 
 ```haskell
 data Sub  =
@@ -134,7 +136,7 @@ applySub (ty :< s)    (S x) = applySub s x
 applySub (s1 :<> s2)     x  = subst s2 (applySub s1 x)
 ```
 
-The advantage of the defunctionalized version is that (1) it is easier for us to see what is going on when we work with datatypes than with functions and (2) if we wanted to we could optimize this representation before applying it to an expression. For example the substitution `Inc k <> Inc l` is equal to `Inc (k + l)`. And if we ever have `subst s1 (subst s2 e)` we can fuse the two traversals together into a single one, using composition with `subst (s1 :<> s2) e`. (See the module [SubstTypedOpt](src/SubstTypedOpt.hs) for more details.
+The advantage of the defunctionalized version is that (1) it is easier for us to see what is going on when we work with datatypes than with functions and (2) if we wanted to we could optimize this representation before applying it to an expression. For example the substitution `Inc k <> Inc l` is equal to `Inc (k + l)`. And if we ever have `subst s1 (subst s2 e)` we can fuse the two traversals together into a single one, using composition with `subst (s1 :<> s2) e`. (See the module [SubstTypedOpt](src/SubstTypedOpt.hs) for more details.)
 
 ### Generic substitutions
 
@@ -155,7 +157,7 @@ instance SubstDB Exp where
   var = Var
   subst s (IntE x)    = IntE x
   subst s (Var i)     = applySub s i
-  subst s (App e1 e2) = AppE (subst s e1)(subst s e2)
+  subst s (App e1 e2) = AppE (subst s e1) (subst s e2)
   subst s (Lam ty e)  = LamE ty (lift s) e
 ```
 As a result, we can separate our implementation into two modules, a general purpose library for substitution (called [Subst](src/Subst.hs)) and the language implementation that uses this library (called [Simple](src/Simple.hs)).
@@ -165,7 +167,7 @@ As a result, we can separate our implementation into two modules, a general purp
 As an example of a function that uses this representation of 
 simply-typed lambda terms, consider this stepping function below. 
 
-This function takes a closed term and either returns the next step after a beta-reduction, or Nothing if the term is already a value. Or, if the term isn't closed, or doesn't type check, the function calls `error`. There are a lot of places that could trigger error, maybe we should do something about that in [Part II](debruijn2.md).
+This function takes a closed term and either returns the next step after a beta-reduction, or `Nothing` if the term is already a value. Or, if the term isn't closed, or doesn't type check, the function calls `error`. There are a lot of places that could trigger error, maybe we should do something about that in [Part II](debruijn2.md).
 
 ```haskell
 -- | Small-step evaluation
@@ -181,9 +183,9 @@ step (AppE e1 e2) = Just $ stepApp e1 e2 where
    stepApp (AppE e1' e2') e2 = AppE (stepApp e1' e2') e2
 ```
 
+---
 
-
-NOTES
+*NOTES:*
 
 [^1]: Occasionally, we can work in a setting where we don't need to worry about one or two of these issues. For example, if we only need to model a small-step operational semantics for closed terms, we don't need to worry about variable capture during substitution and can ignore (2). Alternatively, if we use a locally-nameless representation, we never substitute into terms with free variables represented by indices, so we can ignore (3).
 

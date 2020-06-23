@@ -69,3 +69,10 @@ $(singletons [d|
 
  |])
 
+-- | Note, the <> for this Sub
+-- is in different order than Category's . for SubstTyped or SubstScoped,
+instance Semigroup (Sub a) where
+    (<>) = flip (<>)
+
+instance Monoid (Sub a) where
+    mempty = nilSub

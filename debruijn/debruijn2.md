@@ -1,10 +1,10 @@
 # Part II: Type-indexed term representation for STLC
 
-*Reference files [SubstTyped](src/SubstTyped.hs) and [SimpleTyped](src/SimpleTyped.hs).*
+*Reference files:* [SubstTyped](src/SubstTyped.hs) and [SimpleTyped](src/SimpleTyped.hs)
 
 ## Type-indexed substitutions
 
-The AST for expressions that we developed in the last part is not type-indexed. It can represent nonsensical STLC terms that might trigger an error if we tried to evaluation them. In this section, we'll add type parameters to the datatype definition so that it can only represent well typed terms.
+The AST for expressions that we developed in the last part is not type-indexed. It can represent nonsensical STLC terms that might trigger an error if we tried to evaluate them. In this section, we'll add type parameters to the datatype definition so that it can only represent well-typed terms.
 
 We will also add type parameters to the substitution operation (and reified substitutions) to make sure that as we work with well-typed terms, substitutions stay well-typed.
 
@@ -40,7 +40,7 @@ lift :: SubstDB a => Sub a ??? -> Sub a ???
 lift s = var Z :< (s :<> Inc 1)
 ```
 
-And to continue with our madlibs in the [Simple](src/Simple.hs) module, constraining the implementation to be for the simply typed lambda calculus.
+And to continue with our madlibs in the [Simple](src/Simple.hs) module, constraining the implementation to be for the simply-typed lambda calculus.
 
 ```haskell
 data Exp ??? where
@@ -70,7 +70,7 @@ instance SubstDB Exp where
 
 ## Strongly-typed AST
 
-In the case of STlC, recall that there are only two forms of types, a base type (i.e. Int) and function types.
+In the case of STLC, recall that there are only two forms of types, a base type (i.e. `Int`) and function types.
 
 ```haskell
 data Ty = IntTy | Ty :-> Ty
@@ -113,11 +113,11 @@ data Exp :: [Ty] -> Ty -> Type where
  -- context.
 ```
 
-For lambda expressions, we need to connect the runtime type parameter, of type `STy t1` to the type of the variable. We won't go into what this type is or how it works now --- that will have to wait until [Part IV](debruijn4.md).
+For lambda expressions, we need to connect the run-time type parameter, of type `STy t1` to the type of the variable. We won't go into what this type is or how it works now --- that will have to wait until [Part IV](debruijn4.md).
 
 ### Typed indices
 
-In [Part I](debruijn1.md), we just used natural numbers as our de Bruijn indices, and (even though we displayed them as integer numberals) we represented them using Peano numbers. We will do the same here, except that we can give this version of the natural numbers a type that explicitly indicates that they are an index into a (generic) list.
+In [Part I](debruijn1.md), we just used natural numbers as our de Bruijn indices, and (even though we displayed them as integer numerals) we represented them using Peano numbers. We will do the same here, except that we can give this version of the natural numbers a type that explicitly indicates that they are an index into a (generic) list.
 
 ```haskell
 data Idx (g::[a]) (t::a) :: Type where
@@ -141,11 +141,11 @@ Examples:
 
 ### Typed substitutions
 
-A typed AST requires a substitution operation that shows that substitution is type preserving, i.e. if an expression has type `t`, then after a substitution has been applied should still have type `t`.  
+A typed AST requires a substitution operation that shows that substitution is type-preserving, i.e. if an expression has type `t`, then after a substitution has been applied it should still have type `t`.
 
-However, because we are working with open terms, substitution is not only type preserving, but context *transforming*: the initial context used for the expression may not be the same one after the substitution. For example, if we have an expression with one free variable and we replace that variable with a literal integer, the result should be a closed expression.
+However, because we are working with open terms, substitution is not only type-preserving, but context *transforming*: the initial context used for the expression may not be the same one after the substitution. For example, if we have an expression with one free variable and we replace that variable with a literal integer, the result should be a closed expression.
 
-In other words, the substitution operation should have type, where the context transformation is given by the type indices of the substitution itself.
+In other words, the substitution operation should have the following type, where the context transformation is given by the type indices of the substitution itself.
 
 ```haskell
 subst :: Sub Exp g g' -> Exp g t -> Exp g' t
@@ -160,7 +160,7 @@ data Sub (a :: ([k] -> k -> Type)) (g :: [k]) (g'::[k]) where
    (:<>) :: Sub a g1 g2 -> Sub a g2 g3 -> Sub a g1 g3
 ```
 
-Before, we just used natural number as the argument of the increment substitution. We would still like to do that, but we need its type to tell us what to add to the context when we increment.
+Before, we just used a natural number as the argument of the increment substitution. We would still like to do that, but we need its type to tell us what to add to the context when we increment.
 
 ```haskell
 data IncBy (g :: [k]) where
@@ -171,19 +171,19 @@ data IncBy (g :: [k]) where
 If we increment by 0, i.e. using `IZ`, then our type normalizes to the expected type of the identity substitution. This substitution leaves the context alone. (Haskell can figure out this type for us, but we add it to the source file because that is good style.)
 
 ```haskell
--- nil :: Sub a g g
+-- nilSub :: Sub a g g
 nilSub = Inc IZ
 ```
 
 Similarly, the `lift` and `singleSub` operations have inferrable types. The only change is the adoption of the `IncBy` datatype. (NOTE: if we were in Agda, we could overload the data constructors for `Z` and `S`, but then would not be able to infer the types automatically.)
 
 ```haskell
---singleSub :: a g t -> Sub a (t:g) g
+-- singleSub :: a g t -> Sub a (t:g) g
 singleSub t = t :< Inc IZ
 ```
 
 ```haskell
---lift :: SubstDB a => Sub a g g' -> Sub a (t:g) (t:g')
+-- lift :: SubstDB a => Sub a g g' -> Sub a (t:g) (t:g')
 lift s = var Z :< (s :<> Inc (IS IZ))
 ```
 
@@ -221,9 +221,11 @@ step (AppE e1 e2) = Just $ stepApp e1 e2 where
     stepApp (AppE e1' e2') e2 = AppE (stepApp e1' e2') e2
 ```
 
-*ADDITIONAL NOTES:*
+---
 
-1. This definition of index is perfect for safely accessing a heterogeneous list: *i.e.* a list where each element may have a different type.
+*NOTES:*
+
+1. This definition of index is perfect for safely accessing a heterogeneous list, *i.e.* a list where each element may have a different type.
 
     ```haskell
     data HList (g :: [k]) where
@@ -237,7 +239,7 @@ step (AppE e1 e2) = Just $ stepApp e1 e2 where
        (HCons x xs) -> indx xs n
     ```
   
-    Note that we index into this heterogeneous list, we never need to include a case for `HNil`.   The   type indices guarantee that the index will be found in the list (and has the appropriate   type).
+    Note that when we index into this heterogeneous list, we never need to include a case for `HNil`.   The   type indices guarantee that the index will be found in the list (and has the appropriate   type).
 
 2. In this example we could skip the definition of the `Ty` datatype by using Haskell types to represent STLC types. But we will need this data structure when we go to System F, so we introduce it here.
 

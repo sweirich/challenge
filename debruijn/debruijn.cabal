@@ -24,6 +24,7 @@ library
                        SimpleScoped
                        SimpleTyped
                        SimpleTypedOpt
+                       SimpleTypedNorm
                        Poly
                        PolyScoped
                        PolyTyped

@@ -9,8 +9,8 @@ As in [Poly](src/Poly.hs), we use de Bruijn indices for both term and type varia
 To distinguish these parallel definitions, we qualify the imports in what follows below.
 
 ```haskell
-import qualified Subst as U         -- for type-level substitution
-import qualified SubstTyped as T    -- for term-level substitution
+import qualified Subst as U         -- for type-level substitutions (which are weakly-typed, aka. Untyped)
+import qualified SubstTyped as T    -- for term-level substitutions (which are strongly-typed, aka. Typed)
 ```
 
 So, for this version, we start with the expression datatype that we saw in [Part II](debruijn2.md), but we make two changes.
@@ -123,13 +123,13 @@ $(singletons [d|
   |])
 ```    
 
-For example, we can represent the polymorphic identity function `/\a. \x -> x`, of type `forall a. a -> a`, with this term. Note that the term is closed so the context `g` is the empty list `'[]`.
+For example, we can represent the polymorphic identity function "`/\a. \x -> x`", of type "`forall a. a -> a`", with this term. Note that the term is closed so the context `g` is the empty list `'[]`.
 
 ```haskell
 polyId :: Exp '[] (PolyTy (VarTy U.Z :-> VarTy U.Z))
 polyId = TyLam (LamE (SVarTy U.SZ) (VarE T.Z))
 ``` 
-In the definition of this term we first introduce the type variable "a" with `TyLam`. Then the type of the argument to the term abstraction `LamE`, is "a", which we write as `SVarTy U.SZ` the singleton analogue of `VarTy U.Z`. (Recall that type variable indices, such as `U.Z`, comes from the weakly-typed substitution library [Subst](src/Subst.hs).)  Finally, the body of the term abstraction is a term variable, with index `T.Z` (using the definition from the strongly-typed substitution library [SubstTyped](src/SubstTyped.hs)).
+In the definition of this term we first introduce the type variable "`a`" with `TyLam`. Then the type of the argument to the term abstraction `LamE`, is "`a`", which we write as `SVarTy U.SZ` the singleton analogue of `VarTy U.Z`. (Recall that type variable indices, such as `U.Z`, comes from the weakly-typed substitution library [Subst](src/Subst.hs).)  Finally, the body of the term abstraction is a term variable, with index `T.Z` (using the definition from the strongly-typed substitution library [SubstTyped](src/SubstTyped.hs)).
 
 ### TyApp
 
@@ -164,7 +164,7 @@ IntTy :-> IntTy
 
 ## Term and Type substitutions
 
-In addition to `Exp`, we also must define how term substitution (`subst`) and type substitution (`substTy`) for this AST.
+In addition to `Exp`, we also must define term substitution (`subst`) and type substitution (`substTy`) for this AST.
 
 As in [Part II](debruijn2.md), the definition of term substitution in terms uses the definitions from the strongly-typed substitution framework [SubstTyped](src/SubstTyped.hs). This means that the substitution function from the `SubstDB` type class has an expressive type, describing how the environment changes during term substitution. 
 
@@ -261,7 +261,7 @@ However, not only is this inefficient in terms of time (every time we substitute
 
 This approach is dangerous, but can be justified. By dangerous, we mean that if we get this axiom wrong, we can introduce a hole into the GHC type system. In otherwords, we could cause a well-typed Haskell program to crash!
 
-That sounds scary, but that is actually the approach taken in the implementation in [PolyTyped](src/PolyTyped.hs). The justification for this axiom is twofold. First, it is derived from properties that follow from a somewhat similar implementation in Coq. Second, we can also use tools like quickcheck to increase our confidence in the property itself. Although quickcheck cannot produce a proof, it can test a property like the one above with many, many examples. And properties involving lists are often easy to test.
+That sounds scary, but that is actually the approach taken in the implementation in [PolyTyped](src/PolyTyped.hs). The justification for this axiom is twofold. First, it is derived from properties that follow from a somewhat similar implementation in Coq. Second, we can also use tools like QuickCheck to increase our confidence in the property itself. Although QuickCheck cannot produce a proof, it can test a property like the one above with many, many examples. And properties involving lists are often easy to test.
 
 3. Extend the GHC type checker
 

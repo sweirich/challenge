@@ -38,7 +38,7 @@ dependencies. Polymorphic type variables are represented using de Bruijn
 indices, but term variables are sometimes expressed using HOAS (for CPS
 conversion) and sometimes expressed using de Bruijn indices (for closure
 conversion, and hoisting). Because this is a compiler, the paper only proves
-that the various transformations are type preserving. It does not define a
+that the various transformations are type-preserving. It does not define a
 general substitution operation for System F terms.
 
 - Pfenning and Lee, *[Metacircularity in the polymorphic λ-calculus](https://www.sciencedirect.com/science/article/pii/030439759090109U)*. Theoretical Computer Science 89 (1991) 137-159. 

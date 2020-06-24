@@ -147,11 +147,6 @@ prop_6 t2 g = map (subst (t2 :< Inc Z)) (map (subst (Inc (S Z))) g) == g
 
 -------------------------------------------------------------------
 
-instance Semigroup (Sub a) where
-  (<>)    = (:<>)
-instance Monoid (Sub a) where
-   mempty = nilSub
-
 prop_assoc :: Sub Exp -> Sub Exp -> Sub Exp -> Idx -> Bool
 prop_assoc s1 s2 s3 x = applySub ((s1 <> s2) <> s3) x == applySub (s1 <> (s2 <> s3)) x
 

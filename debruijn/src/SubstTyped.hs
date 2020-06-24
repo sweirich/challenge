@@ -4,6 +4,8 @@ import qualified Nat (Nat(..),SNat(..),Length,length,LengthSym0)
 import Imports
 import Unsafe.Coerce
 
+import qualified Control.Category as C
+
 -- | Variable reference in a context
 -- This type is isomorphic to the natural numbers
 data Idx (g :: [k]) (t::k) :: Type where
@@ -56,6 +58,10 @@ incSub = Inc (IS IZ)
 
 infixr :<    -- like usual cons operator (:)
 infixr :<>   -- like usual composition  (.)
+
+instance C.Category (Sub (a :: [k] -> k -> Type)) where
+    id = nilSub
+    (.) = flip (:<>)
 
 add :: IncBy g1 -> Idx g t -> Idx (g1 ++ g) t
 add IZ i = i

@@ -4,6 +4,8 @@ module SubstScoped where
 import Imports
 import Nat 
 
+import qualified Control.Category as C
+
 -- In this file, we will call Nats "Scopes". I.e. they 
 -- are used to describe the number of free variables allowed in 
 -- a term.    
@@ -37,6 +39,10 @@ data Sub (a :: Nat -> Type) (n :: Nat) (m :: Nat) where
 
 infixr :<     -- like usual cons operator (:)
 infixr :<>    -- like usual composition  (.)
+
+instance C.Category (Sub a) where
+    id = nilSub
+    (.) = flip (:<>)
 
 -- | Identity substitution, leaves all variables alone
 nilSub :: Sub a n n 

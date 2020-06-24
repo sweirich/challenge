@@ -1,12 +1,15 @@
+{-# LANGUAGE TemplateHaskell #-}
 -- | A version of STLC with a strongly-typed AST
 module SimpleTyped where
 
 import Imports
 import SubstTyped
 
--- Same definition of types as in Simple
-data Ty = IntTy | Ty :-> Ty
-   deriving (Eq,Show)
+$(singletons [d|
+    -- Same definition of types as in Simple
+    data Ty = IntTy | Ty :-> Ty | Ty :* Ty | UnitTy
+       deriving (Eq,Show)
+  |])
 
 -- But the type of expressions now includes a context (g) and type (t)
 data Exp :: [Ty] -> Ty -> Type where
@@ -24,6 +27,20 @@ data Exp :: [Ty] -> Ty -> Type where
         -> Exp g t1              -- argument
         -> Exp g t2
 
+ FstE   :: Exp g (t1 :* t2)
+        -> Exp g t1
+
+ SndE   :: Exp g (t1 :* t2)
+        -> Exp g t2
+
+ PairE  :: Exp g t1
+        -> Exp g t2
+        -> Exp g (t1 :* t2)
+
+ UnitE  :: Exp g UnitTy
+
+deriving instance Show (Exp g t)
+
 -- same instance definition as before
 instance SubstDB Exp where
    var = VarE
@@ -32,8 +49,12 @@ instance SubstDB Exp where
    subst s (VarE x)     = applySub s x
    subst s (LamE ty e)  = LamE ty (subst (lift s) e)
    subst s (AppE e1 e2) = AppE (subst s e1) (subst s e2)
+   subst s (FstE e)     = FstE (subst s e)
+   subst s (SndE e)     = SndE (subst s e)
+   subst s (PairE e1 e2) = PairE (subst s e1) (subst s e2)
+   subst _ UnitE         = UnitE
 
-
+{-
 -----------------------------------------------------------------------
 -- Examples
 
@@ -102,3 +123,4 @@ reduce (AppE e1 e2) = case reduce e1 of
   -- IntE x    -> error "type error" -- don't have to observe this type error, but we can  
   LamE t e1 -> subst (singleSub (reduce e2)) e1
   e1'       -> AppE e1' (reduce e2)
+-}

@@ -12,6 +12,8 @@ data Idx (g :: [k]) (t::k) :: Type where
   Z :: Idx (t:g) t
   S :: Idx g t -> Idx (u:g) t
 
+deriving instance Show (Idx g t)
+
 -- | "Environment" heterogenous list
 -- indexed by a list 
 

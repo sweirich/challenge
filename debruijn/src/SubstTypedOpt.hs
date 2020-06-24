@@ -9,7 +9,7 @@ module SubstTypedOpt(
    
    -- * -- Substitution class & constructors
    Idx(..), Sub(..), IncBy(..), SubstDB(..), 
-   nilSub, incSub, single, comp, 
+   nilSub, incSub, singleSub, comp, 
    applySub, mapIdx, mapInc, addBy, 
  ) where
 
@@ -37,7 +37,7 @@ unbind (Bind s a) = subst s a
 
 -- | replace the variable bound at the binder with a term
 instantiate :: SubstDB a => Bind a t1 g t2 -> a g t1 -> a g t2
-instantiate (Bind s a) b = subst (comp s (single b)) a
+instantiate (Bind s a) b = subst (comp s (singleSub b)) a
 {-# INLINABLE instantiate #-}
 
 -- | substitute through the binder
@@ -73,8 +73,8 @@ incSub :: forall t a g. Sub a g (t:g)
 incSub = Inc (IS IZ)
 
 -- | Single substitution (for index 0)
-single :: a g t -> Sub a (t:g) g
-single t = t :< nilSub
+singleSub :: a g t -> Sub a (t:g) g
+singleSub t = t :< nilSub
 
 infixr :<    -- like usual cons operator (:)
 infixr :<>   -- like usual composition  (.)
@@ -94,9 +94,6 @@ applySub (Inc n)       x  = var (add n x)
 applySub (ty :< s)     Z  = ty
 applySub (ty :< s)  (S x) = applySub s x
 applySub (s1 :<> s2)   x  = subst s2 (applySub s1 x)
-
-singleSub :: a g t -> Sub a (t:g) g
-singleSub t = t :< Inc IZ
 
 lift :: SubstDB a => Sub a g g' -> Sub a (t:g) (t:g')
 lift s = var Z :< (s :<> Inc (IS IZ))

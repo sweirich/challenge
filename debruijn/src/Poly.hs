@@ -119,20 +119,25 @@ stepTyApp (TyLam e1)     t1 = substTy (singleSub t1) e1
 stepTyApp (TyApp e1 t2)  t1 = TyApp (stepTyApp e1 t2) t1
 
 
--- | open reduction
+-- | Open, parallel reduction (i.e. reduce under lambda expressions)
+-- This doesn't fully reduce the lambda term to normal form in one step
+-- (but is guaranteed to terminate, even on ill-typed terms)
 reduce :: Exp -> Exp
-reduce (IntE x)   = IntE x
-reduce (VarE n)   = VarE n
-reduce (LamE t e) = LamE t (reduce e)
-reduce (AppE (LamE t e1)  e2) = subst (singleSub (reduce e2)) (reduce e1)
-reduce (AppE (IntE x)     e2) = error "Type error"
-reduce (AppE (TyLam e1)   e2) = error "Type error"
-reduce (AppE e1 e2)           = AppE (reduce e1) (reduce e2)
-reduce (TyLam e)              = TyLam (reduce e)
-reduce (TyApp (TyLam e)    t) = substTy (singleSub t) (reduce e)
-reduce (TyApp (IntE x)     t) = error "Type error"
-reduce (TyApp (LamE t1 e2) t) = error "Type error"
-reduce (TyApp e            t) = TyApp (reduce e) t
+reduce (IntE x)     = IntE x
+reduce (VarE n)     = VarE n
+reduce (LamE t e)   = LamE t (reduce e)
+reduce (TyLam e)    = TyLam (reduce e)
+reduce (AppE e1 e2) = case reduce e1 of
+  IntE x     -> error "type error" -- don't have to observe this type error, but we can
+  TyLam e    -> error "type error"
+  LamE t e1' -> subst (singleSub (reduce e2)) e1'
+  e1'        -> AppE e1' (reduce e2)
+reduce (TyApp e1 t) = case reduce e1 of
+  IntE x    -> error "type error" -- don't have to observe this type error, but we can
+  LamE t e1 -> error "type error" -- don't have to observe this type error, but we can
+  TyLam e1' -> substTy (singleSub t) e1'
+  e1'       -> TyApp e1' t
+
 
 ---------------------------------------------------------------------------------
 -- | Type checker

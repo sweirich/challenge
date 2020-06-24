@@ -93,19 +93,48 @@ stepTyApp (AppE e1' e2') t1 = TyApp (stepApp e1' e2') t1
 stepTyApp (TyLam e1)     t1 = substTy (W.sSingleSub t1) e1
 stepTyApp (TyApp e1 t2)  t1 = TyApp (stepTyApp e1 t2) t1
 
--- | open reduction
-reduce :: forall g t. Exp g t -> Exp g t
-reduce (IntE x)   = IntE x
-reduce (VarE n)   = VarE n
-reduce (LamE t e) = LamE t (S.bind (reduce (S.unbind e)))
-reduce (AppE (LamE t e1) e2) = S.subst (S.single (reduce e2)) (reduce (S.unbind e1))
---reduce (AppE (IntE x)     e2) = error "Type error"
---reduce (AppE (TyLam e1)   e2) = error "Type error"
-reduce (AppE e1 e2)          = AppE (reduce e1) (reduce e2)
-reduce (TyLam e)             = TyLam (reduce e)
-reduce (TyApp (TyLam e) (t1 :: STy t1))
-      | Refl <- axiom6 @t1 @g
-      = substTy (W.sSingleSub t1) (reduce e)
---reduce (TyApp (IntE x)     t) = error "Type error"
---reduce (TyApp (LamE t1 e2) t) = error "Type error"    
-reduce (TyApp e t)           = TyApp (reduce e) t
+
+-- | Big-step evaluation of closed terms
+-- To do this correctly, we need to define a separate type
+-- for values. 
+data Val :: [Ty] -> Ty -> Type where
+  IntV :: Int -> Val g IntTy
+  LamV :: Π (t1 :: Ty)          -- type of binder
+        -> S.Bind Exp t1 g t2        -- body of abstraction
+        -> Val g (t1 :-> t2)
+  TyLamV :: Exp (IncList g) t   -- bind a type variable
+         -> Val g (PolyTy t)
+
+eval :: Exp '[] t -> Val '[] t
+eval (IntE x) = IntV x
+eval (VarE n) = case n of {}
+eval (LamE t e) = LamV t e
+eval (AppE e1 e2) =
+  case eval e1 of
+    (LamV t e1') -> eval (S.subst (S.singleSub e2) (S.unbind e1'))
+eval (TyLam e) = TyLamV e
+eval (TyApp e1 t) =
+  case eval e1 of
+    (TyLamV e1') -> eval (substTy (W.sSingleSub t) e1')
+
+
+
+-- | Open, parallel reduction (i.e. reduce under lambda expressions)
+-- This doesn't fully reduce the lambda term to normal form in one step
+reduce :: forall g t. Exp g t -> Exp g t 
+reduce (IntE x)     = IntE x
+reduce (VarE n)     = VarE n
+reduce (LamE t e)   = LamE t (S.bind (reduce (S.unbind e)))
+reduce (TyLam e)    = TyLam (reduce e)
+reduce (AppE e1 e2) = case reduce e1 of
+  -- IntE x     -> error "type error"
+  -- TyLam e    -> error "type error"
+  LamE t e1' -> S.subst (S.singleSub (reduce e2)) (S.unbind e1')
+  e1'        -> AppE e1' (reduce e2)
+reduce (TyApp e1 (t :: STy t1)) 
+  | Refl <- axiom6 @t1 @g
+  = case reduce e1 of
+      -- IntE x    -> error "type error" 
+      -- LamE t e1 -> error "type error" 
+      TyLam e1' -> substTy (W.sSingleSub t) e1'
+      e1'       -> TyApp e1' t

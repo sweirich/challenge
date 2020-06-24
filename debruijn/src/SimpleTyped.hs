@@ -73,13 +73,16 @@ eval (AppE e1 e2) =
   case eval e1 of
     (LamV t e1') -> eval (subst (singleSub e2) e1')
 
--- | Reduce open expressions to their normal form
+-- | Open, parallel reduction (i.e. reduce under lambda expressions)
+-- This doesn't fully reduce the lambda term to normal form in one step
 reduce :: Exp g t -> Exp g t
 reduce (IntE x)   = IntE x
 reduce (VarE n)   = VarE n
 reduce (LamE t e) = LamE t (reduce e)
-reduce (AppE (LamE t e1) e2)   = subst (singleSub (reduce e2)) (reduce e1)
--- reduce (AppE (IntE x)    e2)   = error "Type error!"
-reduce (AppE e1 e2) = AppE (reduce e1) (reduce e2)
+reduce (AppE e1 e2) = case reduce e1 of
+  -- IntE x    -> error "type error" -- don't have to observe this type error, but we can  
+  LamE t e1 -> subst (singleSub (reduce e2)) e1
+  e1'       -> AppE e1' (reduce e2)
+
 
 

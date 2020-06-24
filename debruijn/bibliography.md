@@ -107,10 +107,11 @@ Maybe (Maybe Void)   == Idx (S (S Z))  contains 2 elements
 ...
 ```
 
-- Edward Kmett. *[Bound](https://www.schoolofhaskell.com/user/edwardk/bound)*. December 2105.
+- Edward Kmett. *[Bound](https://www.schoolofhaskell.com/user/edwardk/bound)*. December 2015.
 
 A Haskell library for working with well-scoped terms using de Bruijn indices.
 
+- Pottier. *[DB lib](https://github.com/coq-community/dblib)* Coq library for de Bruijn indices. 2013.
 
 - Pottier. *[Revisiting the CPS Transformation and its
   Implementation](http://gallium.inria.fr/~fpottier/publis/fpottier-cps.pdf). Draft

@@ -13,8 +13,8 @@ data Exp :: [Ty] -> Ty -> Type where
 
  IntE   :: Int -> Exp g IntTy
 
- VarE   :: Idx g t               -- variable index
-        -> Exp g t
+ VarE   :: !(Idx g t)            -- variable index
+        -> Exp g t               -- important to make this strict
 
  LamE   :: Π (t1 :: Ty)          -- type of binder
         -> Exp (t1:g) t2         -- body of abstraction
@@ -44,7 +44,7 @@ instance SubstDB Exp where
 -- evaluation
 step :: Exp '[] t -> Maybe (Exp '[] t)
 step (IntE x)     = Nothing
-step (VarE n)     = case n of {}
+--step (VarE n)     = error "Unbound variable"
 step (LamE t e)   = Nothing
 step (AppE e1 e2) = Just $ stepApp e1 e2 where
 
@@ -52,7 +52,7 @@ step (AppE e1 e2) = Just $ stepApp e1 e2 where
     -- *always* take a step if a closed term is an application expression.
     stepApp :: Exp '[] (t1 :-> t2) -> Exp '[] t1  -> Exp '[] t2
     --stepApp (IntE x)       e2 = error "Type error"
-    stepApp (VarE n)       e2 = case n of {}
+    --stepApp (VarE n)       e2 = error "Unbound variable"
     stepApp (LamE t e1)    e2 = subst (singleSub e2) e1
     stepApp (AppE e1' e2') e2 = AppE (stepApp e1' e2') e2
 
@@ -68,12 +68,12 @@ data Val :: [Ty] -> Ty -> Type where
 -- | Like 'step', but return a 'Val' if the term is already a value.
 stepV :: Exp '[] t -> Either (Val '[] t) (Exp '[] t)
 stepV (IntE x)     = Left (IntV x)
-stepV (VarE n)     = case n of {}
+--stepV (VarE n)     = error "Unbound variable"
 stepV (LamE t e)   = Left (LamV t e)
 stepV (AppE e1 e2) = stepApp e1 e2 where
     stepApp :: Exp '[] (t1 :-> t2) -> Exp '[] t1  -> Either (Val '[] t2) (Exp '[] t2)
     --stepApp (IntE x)       e2 = error "Type error"
-    stepApp (VarE n)       e2 = case n of {}
+    --stepApp (VarE n)       e2 = error "Unbound variable"
     stepApp (LamE t e1)    e2 = Right (subst (singleSub e2) e1)
     stepApp (AppE e1' e2') e2 = Right (AppE (either val2exp id (stepApp e1' e2')) e2)
 
@@ -86,7 +86,7 @@ val2exp (LamV t x) = LamE t x
 
 eval :: Exp '[] t -> Val '[] t
 eval (IntE x) = IntV x
-eval (VarE n) = case n of {}
+--eval (VarE n) = error "Unbound variable"
 eval (LamE t e) = LamV t e
 eval (AppE e1 e2) =
   case eval e1 of

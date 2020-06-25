@@ -16,7 +16,7 @@ data Ty = IntTy | Ty :-> Ty
 data Exp :: Type where
   IntE   :: Int      -- literal ints
          -> Exp
-  VarE   :: Idx      -- variables (Idx is defined in Subst)
+  VarE   :: !Idx     -- variables (Idx is defined in Subst)
          -> Exp 
   LamE   :: Ty       -- type of binder
          -> Exp      -- body of abstraction

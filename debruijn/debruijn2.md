@@ -47,7 +47,7 @@ data Exp ??? where
 
  IntE   :: Int -> Exp ???  -- literal int
 
- VarE   :: Idx ???         -- variable index
+ VarE   :: !(Idx ???)      -- variable index
         -> Exp ???
 
  LamE   :: ???             -- type of binder
@@ -93,7 +93,7 @@ data Exp :: [Ty] -> Ty -> Type where
  IntE   :: Int -> Exp g IntTy
  -- ^ literal ints, valid in any context
 
- VarE   :: Idx g t
+ VarE   :: !(Idx g t)
         -> Exp g t
  -- ^ variables, represented by an index into
  -- the context (see below)
@@ -208,7 +208,7 @@ we can remove it from the definition.
 -- | Small-step evaluation of closed terms.
 step :: Exp '[] t -> Maybe (Exp '[] t)
 step (IntE x)     = Nothing
-step (VarE n)     = case n of {}  -- this case is impossible
+--step (VarE n)     = error "unbound variable"
 step (LamE t e)   = Nothing
 step (AppE e1 e2) = Just $ stepApp e1 e2 where
 
@@ -216,7 +216,7 @@ step (AppE e1 e2) = Just $ stepApp e1 e2 where
     -- *always* take a step if a closed term is an application expression.
     stepApp :: Exp '[] (t1 :-> t2) -> Exp '[] t1  -> Exp '[] t2
     -- stepApp (IntE x)       e2 = error "Type error"
-    stepApp (VarE n)       e2 = case n of {}    
+    -- stepApp (VarE n)       e2 = error "unbound variable"
     stepApp (LamE t e1)    e2 = subst (singleSub e2) e1
     stepApp (AppE e1' e2') e2 = AppE (stepApp e1' e2') e2
 ```

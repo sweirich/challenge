@@ -14,7 +14,7 @@ data Exp :: [Ty] -> Ty -> Type where
 
  IntE   :: Int -> Exp g IntTy
 
- VarE   :: Idx g t               -- variable index
+ VarE   :: !(Idx g t)            -- variable index
         -> Exp g t
 
  LamE   :: Π t1                  -- type of binder
@@ -44,7 +44,7 @@ instance SubstDB Exp where
 -- evaluation
 step :: Exp '[] t -> Maybe (Exp '[] t)
 step (IntE x)     = Nothing
-step (VarE n)     = case n of {}
+--step (VarE n)     = error "Unbound variable"
 step (LamE t e)   = Nothing
 step (AppE e1 e2) = Just $ stepApp e1 e2 where
 
@@ -52,7 +52,7 @@ step (AppE e1 e2) = Just $ stepApp e1 e2 where
     -- *always* take a step if a closed term is an application expression.
     stepApp :: Exp '[] (t1 :-> t2) -> Exp '[] t1  -> Exp '[] t2
     --stepApp (IntE x)       e2 = error "Type error"
-    stepApp (VarE n)       e2 = case n of {}    
+    --stepApp (VarE n)       e2 = error "Unbound variable"    
     stepApp (LamE t e1)    e2 = instantiate e1 e2
     stepApp (AppE e1' e2') e2 = AppE (stepApp e1' e2') e2
 
@@ -68,7 +68,7 @@ data Val :: [Ty] -> Ty -> Type where
 
 eval :: Exp '[] t -> Val '[] t
 eval (IntE x) = IntV x
-eval (VarE n) = case n of {}
+--eval (VarE n) = error "Unbound variable"
 eval (LamE t e) = LamV t e
 eval (AppE e1 e2) =
   case eval e1 of

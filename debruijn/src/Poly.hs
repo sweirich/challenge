@@ -31,7 +31,7 @@ data Exp :: Type where
  IntE   :: Int
         -> Exp
 
- VarE   :: Idx
+ VarE   :: !Idx
         -> Exp 
 
  LamE   :: Ty       -- type of binder

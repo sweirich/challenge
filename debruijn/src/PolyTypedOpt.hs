@@ -15,7 +15,7 @@ data Exp :: [Ty] -> Ty -> Type where
   IntE   :: Int
          -> Exp g IntTy
 
-  VarE   :: S.Idx g t
+  VarE   :: !(S.Idx g t)
          -> Exp g t
 
   LamE   :: Π t1                  -- type of binder
@@ -67,7 +67,7 @@ incTy s (s1 S.:<> s2) = incTy s s1 S.:<> incTy s s2
 -- | Small-step evaluation of closed terms
 step :: Exp '[] t -> Maybe (Exp '[] t)
 step (IntE x)     = Nothing
-step (VarE n)     = case n of {}  
+--step (VarE n)     = error "Unbound variable"  
 step (LamE t e)   = Nothing
 step (AppE e1 e2) = Just $ stepApp e1 e2
 step (TyLam e)    = Nothing
@@ -77,7 +77,7 @@ step (TyApp e t)  = Just $ stepTyApp e t
 -- *always* take a step if a closed term is an application expression.
 stepApp :: Exp '[] (t1 :-> t2) -> Exp '[] t1  -> Exp '[] t2
 --stepApp (IntE x)       e2 = error "Type error"
-stepApp (VarE n)       e2 = case n of {}
+--stepApp (VarE n)       e2 = error "Unbound variable"
 stepApp (LamE t e1)    e2 = S.instantiate e1 e2
 stepApp (AppE e1' e2') e2 = AppE (stepApp e1' e2') e2
 --stepApp (TyLam e)      e2 = error "Type error"
@@ -87,7 +87,7 @@ stepApp (TyApp e1 t1)  e2 = AppE (stepTyApp e1 t1) e2
 -- *always* take a step if a closed term is a type application expression.
 stepTyApp :: Exp '[] (PolyTy t1) -> Π t -> Exp '[] (W.Subst (W.SingleSub t) t1)
 --stepTyApp (IntE x)       e2 = error "Type error"
-stepTyApp (VarE n)       t1 = case n of {}
+--stepTyApp (VarE n)       t1 = error "Unbound variable"
 --stepTyApp (LamE t e1)    t1 = error "Type error"
 stepTyApp (AppE e1' e2') t1 = TyApp (stepApp e1' e2') t1
 stepTyApp (TyLam e1)     t1 = substTy (W.sSingleSub t1) e1
@@ -100,14 +100,14 @@ stepTyApp (TyApp e1 t2)  t1 = TyApp (stepTyApp e1 t2) t1
 data Val :: [Ty] -> Ty -> Type where
   IntV :: Int -> Val g IntTy
   LamV :: Π (t1 :: Ty)          -- type of binder
-        -> S.Bind Exp t1 g t2        -- body of abstraction
+        -> S.Bind Exp t1 g t2   -- body of abstraction
         -> Val g (t1 :-> t2)
   TyLamV :: Exp (IncList g) t   -- bind a type variable
          -> Val g (PolyTy t)
 
 eval :: Exp '[] t -> Val '[] t
 eval (IntE x) = IntV x
-eval (VarE n) = case n of {}
+--eval (VarE n) = error "Unbound variable"
 eval (LamE t e) = LamV t e
 eval (AppE e1 e2) =
   case eval e1 of

@@ -16,7 +16,7 @@ import Poly (Ty(..))
 data Exp :: Nat -> Type where
   IntE   :: Int      -- literal ints
          -> Exp n
-  VarE   :: Idx n     -- variables (Idx is defined in Subst)
+  VarE   :: !(Idx n)   -- variables (Idx is defined in Subst)
          -> Exp n
   LamE   :: Ty         -- type of binder
          -> Exp (S n)  -- body of abstraction (bind a new variable)
@@ -77,7 +77,7 @@ incTy (s1 :<> s2) = incTy s1 :<> incTy s2
 -- In a closed term, the scope is 'Z', because there are zero free variables.
 step :: Exp Z -> Maybe (Exp Z)
 step (IntE x)     = Nothing
-step (VarE n)     = case n of {}
+--step (VarE n)     = error "Unbound variable"
 step (LamE t e)   = Nothing
 step (AppE e1 e2) = Just $ stepApp e1 e2 where
 step (TyLam e)    = Nothing
@@ -85,7 +85,7 @@ step (TyApp e t)  = Just $ stepTyApp e t where
 
 stepApp :: Exp Z -> Exp Z  -> Exp Z
 stepApp (IntE x)       e2 = error "Type error"
-stepApp (VarE n)       e2 = case n of {}    
+--stepApp (VarE n)       e2 = error "Unbound variable"    
 stepApp (LamE t e1)    e2 = subst (singleSub e2) e1
 stepApp (AppE e1' e2') e2 = AppE (stepApp e1' e2') e2
 stepApp (TyLam e)      e2 = error "Type error"
@@ -93,7 +93,7 @@ stepApp (TyApp e1 t1)  e2 = AppE (stepTyApp e1 t1) e2
 
 stepTyApp :: Exp Z -> Ty -> Exp Z
 stepTyApp (IntE x)       e2 = error "Type error"
-stepTyApp (VarE n)       t1 = case n of {}
+--stepTyApp (VarE n)       t1 = error "Unbound variable"
 stepTyApp (LamE t e1)    t1 = error "Type error"
 stepTyApp (AppE e1' e2') t1 = TyApp (stepApp e1' e2') t1
 stepTyApp (TyLam e1)     t1 = substTy (W.singleSub t1) e1

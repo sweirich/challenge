@@ -9,7 +9,7 @@ module SubstTypedOpt(
    
    -- * -- Substitution class & constructors
    Idx(..), Sub(..), IncBy(..), SubstDB(..), 
-   nilSub, incSub, singleSub, comp, 
+   nilSub, weakSub, singleSub, comp, 
    applySub, mapIdx, mapInc, addBy, 
  ) where
 
@@ -69,8 +69,8 @@ nilSub :: Sub a g g
 nilSub = Inc IZ
 
 -- | Weaken
-incSub :: forall t a g. Sub a g (t:g)
-incSub = Inc (IS IZ)
+weakSub :: forall t a g. Sub a g (t:g)
+weakSub = Inc (IS IZ)
 
 -- | Single substitution (for index 0)
 singleSub :: a g t -> Sub a (t:g) g

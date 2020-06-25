@@ -186,13 +186,13 @@ cpsExp g (AppE e1 e2)  k =
       
          k1 :: Cont g' (CpsTy (t1 :-> t2))
          k1 = Meta $ cpsExp (CpsMetaE (t1 :%-> t2) g)
-                        (S.subst S.incSub e2) k2
+                        (S.subst S.weakSub e2) k2
    
          k2 :: Cont (CpsTy (t1 :-> t2) ': g') (CpsTy t1)
          k2 =  Meta $ AppE (AppE (VarE (S.S S.Z)) (VarE S.Z))
                 (reifyCont (sCpsTy t2)
-                 (substCont S.incSub 
-                   (substCont S.incSub k)))
+                 (substCont S.weakSub 
+                   (substCont S.weakSub k)))
    
      in
        cpsExp g e1 k1
@@ -209,7 +209,7 @@ cpsExp (g :: CpsCtx g g') (TyApp e1 (ty :: Sing (ty :: Ty))) k =
   
           k2 :: Cont (CpsTy (PolyTy t1) ': g') 
                      (W.Subst (W.SingleSub (CpsTy ty)) (CpsTy t1))
-          k2 = substCont S.incSub k
+          k2 = substCont S.weakSub k
   
           t1' :: Sing (W.Subst (W.SingleSub (CpsTy ty))  (CpsTy t1))
           t1' = W.sSubst (W.sSingleSub (sCpsTy ty)) (sCpsTy t1)
@@ -232,16 +232,16 @@ sIncCpsCtx  :: forall n g g'.
             -> CpsCtx (IncList g) (IncList g')
 sIncCpsCtx CpsStart = CpsStart
 sIncCpsCtx (CpsLamE (t1 :: Sing t1) (t2 :: p t2) g)
-  | Refl <- cpsCommutes @t1 @W.IncSub
-  , Refl <- cpsCommutes @t2 @W.IncSub
-  = CpsLamE (W.sSubst W.sIncSub t1)
-     (Proxy :: Proxy (W.Subst W.IncSub t2)) (sIncCpsCtx g)
+  | Refl <- cpsCommutes @t1 @W.WeakSub
+  , Refl <- cpsCommutes @t2 @W.WeakSub
+  = CpsLamE (W.sSubst W.sWeakSub t1)
+     (Proxy :: Proxy (W.Subst W.WeakSub t2)) (sIncCpsCtx g)
 sIncCpsCtx (CpsMetaE (t1 :: Sing t1) g)
-  | Refl <- cpsCommutes @t1 @W.IncSub
-  = CpsMetaE (W.sSubst W.sIncSub t1) (sIncCpsCtx g)
+  | Refl <- cpsCommutes @t1 @W.WeakSub
+  = CpsMetaE (W.sSubst W.sWeakSub t1) (sIncCpsCtx g)
 sIncCpsCtx (CpsTyLam (t1 :: Sing t1) g)
-  | Refl <- cpsCommutes @t1 @W.IncSub
-  = CpsTyLam (W.sSubst W.sIncSub t1) (sIncCpsCtx g)
+  | Refl <- cpsCommutes @t1 @W.WeakSub
+  = CpsTyLam (W.sSubst W.sWeakSub t1) (sIncCpsCtx g)
 
 fstCtx :: CpsCtx g g' -> Sing g
 fstCtx CpsStart = SNil

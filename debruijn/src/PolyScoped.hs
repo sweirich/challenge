@@ -64,7 +64,7 @@ substTy s (TyApp e t)  = TyApp (substTy s e) (W.subst s t)
 -- | Increment all types in an expression substitution
 incTy :: forall n m . Sub Exp n m -> Sub Exp n m 
 incTy (Inc x)     = Inc x
-incTy (e :< s1)   = substTy W.incSub e :< incTy s1
+incTy (e :< s1)   = substTy W.weakSub e :< incTy s1
 incTy (s1 :<> s2) = incTy s1 :<> incTy s2
 
 

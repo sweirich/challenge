@@ -18,7 +18,7 @@ import Test.QuickCheck
 $(singletons [d|
     -- increment all terms in a list 
     incList :: SubstDB a => [a] -> [a]
-    incList = map (subst incSub)
+    incList = map (subst weakSub)
 
     -- apply the lift substitution to all terms in the list          
     liftList :: SubstDB a => Sub a -> [a] -> [a]

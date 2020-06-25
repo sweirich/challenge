@@ -6,7 +6,7 @@ module Subst
 
    applySub,  type ApplySub,  sApplySub,  ApplySubSym0,  ApplySubSym1,
    nilSub,    type NilSub,    sNilSub,    NilSubSym0, 
-   incSub,    type IncSub,    sIncSub,    IncSubSym0,
+   weakSub,   type WeakSub,   sWeakSub,   WeakSubSym0,
    singleSub, type SingleSub, sSingleSub, SingleSubSym0, SingleSubSym1,
    lift,      type Lift,      sLift,      LiftSym0,      LiftSym1,
 
@@ -46,8 +46,8 @@ $(singletons [d|
     nilSub = Inc Z
 
     -- increment, shifts all variables by one
-    incSub :: Sub a 
-    incSub = Inc (S Z) 
+    weakSub :: Sub a 
+    weakSub = Inc (S Z) 
 
     -- singleton, replace 0 with t, leave everything
     -- else alone
@@ -64,7 +64,7 @@ $(singletons [d|
     
     -- Used in substitution when going under a binder
     lift :: SubstDB a => Sub a -> Sub a
-    lift s = var Z :< (s :<> incSub)
+    lift s = var Z :< (s :<> weakSub)
 
 
  |])

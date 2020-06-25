@@ -2,8 +2,6 @@ module SubstTyped where
 
 import qualified Nat (Nat(..),SNat(..),Length,length,LengthSym0)
 import Imports
-import Unsafe.Coerce
-
 import qualified Control.Category as C
 
 -- | Variable reference in a context
@@ -48,13 +46,11 @@ data Sub (a :: ([k] -> k -> Type)) (g :: [k]) (g'::[k]) where
    (:<)  :: a g' t -> Sub a g g' -> Sub a (t:g) g'        --  extend a substitution (like cons)
    (:<>) :: Sub a g1 g2 -> Sub a g2 g3 -> Sub a g1 g3 
 
---nil :: Sub a g g 
-nilSub :: forall k (a :: [k] -> k -> Type) (g :: [k]). Sub a g g
+nilSub :: Sub a g g 
 nilSub = Inc IZ
 
---incSub :: forall t a g. Sub a g (t:g)
-incSub :: forall a1 (a2 :: [a1] -> a1 -> Type) (g :: [a1]) (t :: a1). Sub a2 g (t : g)
-incSub = Inc (IS IZ)
+weakSub :: forall t a g. Sub a g (t:g)
+weakSub = Inc (IS IZ)
 
 infixr :<    -- like usual cons operator (:)
 infixr :<>   -- like usual composition  (.)

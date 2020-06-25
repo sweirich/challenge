@@ -49,8 +49,8 @@ nilSub :: Sub a n n
 nilSub = Inc SZ
 
 -- | Increment, shifts all variables by one
-incSub :: Sub a n (S n)
-incSub = Inc (SS SZ)
+weakSub :: Sub a n (S n)
+weakSub = Inc (SS SZ)
 
 -- | Singleton, replace 0 with t, leave everything else alone
 singleSub :: a n -> Sub a (S n) n
@@ -76,7 +76,7 @@ applySub (s1 :<> s2)    x  = subst s2 (applySub s1 x)
 
 -- | Used in a substitution when going under a binder
 lift :: SubstDB a => Sub a n m -> Sub a (S n) (S m)
-lift s = var FZ :< (s :<> incSub)
+lift s = var FZ :< (s :<> weakSub)
 
 
 

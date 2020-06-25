@@ -85,7 +85,7 @@ substTy s (TyApp e t)  = TyApp (substTy s e) (subst s t)
 
 -- | Increment all types in an expression substitution
 incTy :: Sub Exp -> Sub Exp
-incTy = fmap (substTy incSub)
+incTy = fmap (substTy weakSub)
 
 
 
@@ -155,7 +155,7 @@ typeCheck g (AppE e1 e2) = do
       | t12 == t2 -> Just t22
     _ -> Nothing
 typeCheck g (TyLam e) = do
-  ty <- typeCheck (map (subst incSub) g) e
+  ty <- typeCheck (map (subst weakSub) g) e
   return (PolyTy ty)
 typeCheck g (TyApp e ty) = do
   ty0 <- typeCheck g e

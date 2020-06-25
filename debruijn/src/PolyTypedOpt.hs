@@ -40,7 +40,7 @@ instance S.SubstDB Exp where
    subst s (VarE x)     = S.applySub s x
    subst s (LamE ty e)  = LamE ty (S.substBind s e)
    subst s (AppE e1 e2) = AppE (S.subst s e1) (S.subst s e2)
-   subst s (TyLam e)    = TyLam (S.subst (incTy W.sIncSub s) e)
+   subst s (TyLam e)    = TyLam (S.subst (incTy W.sWeakSub s) e)
    subst s (TyApp e t)  = TyApp (S.subst s e) t
 
 substTy :: forall g s ty.

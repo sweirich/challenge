@@ -10,6 +10,12 @@ data Idx (g :: [k]) (t::k) :: Type where
   Z :: Idx (t:g) t
   S :: Idx g t -> Idx (u:g) t
 
+-- | convert to int
+idxToInt :: Idx g t -> Int
+idxToInt Z = 0
+idxToInt (S m) = 1 + idxToInt m
+
+
 -- | "Environment" heterogenous list
 -- indexed by a list 
 

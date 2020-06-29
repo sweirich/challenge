@@ -73,8 +73,10 @@ This development is broken into four main parts, listed below.
   - [TypeCheck](src/TypeCheck.hs): A type checker that translates the weakly-typed AST to the strongly-typed AST (or fails if the term does not type check).
   - [CPS](src/Cps.hs): CPS-conversion algorithm for the strongly-typed System F. The type indices show that this 
   transformation is type-preserving.
-  - [SubstScoped](src/SubstScoped.hs) and [SimpleScoped](src/SimpleScoped): Just keep track of scopes, not types
-
+  - [SubstScoped](src/SubstScoped.hs) and [SimpleScoped](src/SimpleScoped.hs): Just keep track of scopes, not types
+  - [SubstInf](src/SubstInf.hs), [SubstTypedInf](src/SubstTypedInf.hs), [SimpleTypedInf](src/SimpleTypedInf.hs): 
+     represent substitutions using a lazy list. This is significantly more difficult to make strongly typed.
+ 
 - [Bibliography](bibliography.md): Sources and related work. This tutorial is
   inspired by an extensive literature of de Bruijn representations and
   strongly-typed term representations.

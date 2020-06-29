@@ -4,7 +4,7 @@ module SimpleTyped where
 
 import Imports
 import Data.Singletons.TH
-import SubstTyped
+import SubstTypedInf
 
 -- Same definition of types as in Simple
 $(singletons [d|
@@ -112,7 +112,7 @@ eval (AppE e1 e2) =
 
 -- | Open, parallel reduction (i.e. reduce under lambda expressions)
 -- This doesn't fully reduce the lambda term to normal form in one step
-reduce :: Exp g t -> Exp g t
+reduce :: IncI g => Exp g t -> Exp g t
 reduce (IntE x)   = IntE x 
 reduce (VarE n)   = VarE n
 reduce (LamE t e) = LamE t (reduce e)

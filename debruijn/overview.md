@@ -76,6 +76,8 @@ This development is broken into four main parts, listed below.
   - [SubstScoped](src/SubstScoped.hs) and [SimpleScoped](src/SimpleScoped.hs): Just keep track of scopes, not types
   - [SubstInf](src/SubstInf.hs), [SubstTypedInf](src/SubstTypedInf.hs), [SimpleTypedInf](src/SimpleTypedInf.hs): 
      represent substitutions using a lazy list. This is significantly more difficult to make strongly typed.
+  - [SubstTypedFun](src/SubstTypedFun.hs): represent substitutions using functions. This is the version that is 
+    closest to that from Benton et al.
  
 - [Bibliography](bibliography.md): Sources and related work. This tutorial is
   inspired by an extensive literature of de Bruijn representations and

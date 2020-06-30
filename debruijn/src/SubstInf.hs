@@ -35,14 +35,20 @@ class SubstDB a where
 applySub :: Sub a -> Idx -> a
 applySub (Sub s) i = s Nat.!! i
 
+-- | identity substitution, leaves all variables alone
+nilSub :: SubstDB a => Sub a 
+nilSub =  Sub $ var <$> [Z ..]
+
+-- | compose two substitutions together
+composeSub :: SubstDB a => Sub a -> Sub a -> Sub a
+composeSub (Sub s1) s2 = Sub $ map (subst s2) s1
+
+
 -- | Used in substitution when going under a binder
 lift :: SubstDB a => Sub a -> Sub a
 lift s = var Z `consSub` (s `composeSub` weakSub)
 
 
--- | identity substitution, leaves all variables alone
-nilSub :: SubstDB a => Sub a 
-nilSub =  Sub $ var <$> [Z ..]
 
 -- | singleton, replace 0 with t, leave everything
 -- else alone
@@ -53,8 +59,6 @@ singleSub t = t `consSub` nilSub
 weakSub :: SubstDB a => Sub a 
 weakSub = tailSub nilSub
 
-composeSub :: SubstDB a => Sub a -> Sub a -> Sub a
-composeSub (Sub s1) s2 = Sub $ map (subst s2) s1
 
 consSub :: a -> Sub a -> Sub a
 consSub x (Sub s) = Sub $ x:s

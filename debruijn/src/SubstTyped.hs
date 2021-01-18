@@ -48,43 +48,74 @@ data IncBy (g :: [k]) where
    IS :: IncBy n -> IncBy (t:n)
 
 data Sub (a :: ([k] -> k -> Type)) (g :: [k]) (g'::[k]) where
-   Inc   :: IncBy g1 -> Sub a g (g1 ++ g)                 --  increment by n (shift)                
+   Id    :: Sub a g g                                     -- identity substitution
    (:<)  :: a g' t -> Sub a g g' -> Sub a (t:g) g'        --  extend a substitution (like cons)
-   (:<>) :: Sub a g1 g2 -> Sub a g2 g3 -> Sub a g1 g3 
+   Lift  :: Sub a n m -> Sub a (t:n) (t:m)         --  Used in Substitution when going under a binder
+
 
 nilSub :: Sub a g g 
-nilSub = Inc IZ
+nilSub = Id
 
-weakSub :: forall t a g. Sub a g (t:g)
-weakSub = Inc (IS IZ)
+-- weakSub :: forall t a g. Sub a g (t:g)
+-- weakSub = Inc (IS IZ)
 
 infixr :<    -- like usual cons operator (:)
-infixr :<>   -- like usual composition  (.)
 
-instance C.Category (Sub (a :: [k] -> k -> Type)) where
+comp :: SubstDB a => Sub a n m -> Sub a m p -> Sub a n p
+comp Id          s2         = s2
+comp (tm :< s1)  s2         = subst s2 tm :< comp s1 s2
+comp (Lift s1)   Id         = Lift s1
+comp (Lift s1)   (tm :< s2) = tm :< comp s1 s2
+comp (Lift s1)   (Lift s2)  = Lift (comp s1 s2)
+
+
+
+instance SubstDB a => C.Category (Sub (a :: [k] -> k -> Type)) where
     id = nilSub
-    (.) = flip (:<>)
+    (.) = flip comp
 
 add :: IncBy g1 -> Idx g t -> Idx (g1 ++ g) t
 add IZ i = i
 add (IS xs) i = S (add xs i)
 
+-- | Type preserving renaming
+--
+-- In fact, only renaming used are
+-- weakening (S) and lifts (liftRename)
+type Rename g g' = forall t. Idx g t -> Idx g' t
+
+liftRename :: Rename g g' -> Rename (t:g) (t:g')
+liftRename f Z     = Z
+liftRename f (S x) = S (f x)
+
 class SubstDB (a :: [k] -> k -> Type) where
-   var   :: Idx g t -> a g t
-   subst :: Sub a g g' -> a g t -> a g' t
+   var    :: Idx g t -> a g t
+   subst  :: Sub a g g' -> a g t -> a g' t
+   rename :: Rename g g' -> a g t -> a g' t
 
 -- | Value of the index x in the substitution s
 applySub :: SubstDB a => Sub a g g' -> Idx g t -> a g' t
-applySub (Inc n)       x  = var (add n x)            
-applySub (ty :< s)     Z  = ty
-applySub (ty :< s)  (S x) = applySub s x
-applySub (s1 :<> s2)   x  = subst s2 (applySub s1 x)
+applySub Id         x     = var x
+applySub (ty :< _)  Z     = ty
+applySub (_  :< s)  (S x) = applySub s x
+applySub (Lift s)   Z     = var Z
+applySub (Lift s)   (S x) = rename S (applySub s x)
+
+-- | An alternative to 'applySub' which (always) renames once.
+applySub' :: SubstDB a => Sub a g g' -> Idx g t -> a g' t
+applySub' = go id where
+    go :: SubstDB a => Rename g' g'' -> Sub a g g' -> Idx g t -> a g'' t
+    go r Id        x     = var (r x)
+    go r (ty :< _) Z     = rename r ty
+    go r (_  :< s) (S x) = go r s x
+    go r (Lift s)  Z     = var (r Z)
+    go r (Lift s)  (S x) = go (r . S) s x
 
 singleSub :: a g t -> Sub a (t:g) g
-singleSub t = t :< Inc IZ
+singleSub t = t :< nilSub
 
 lift :: SubstDB a => Sub a g g' -> Sub a (t:g) (t:g')
-lift s = var Z :< (s :<> Inc (IS IZ))
+lift = Lift
 
 mapIdx :: forall s g t. Idx g t -> Idx (Map s g) (Apply s t)
 mapIdx Z = Z
@@ -94,9 +125,11 @@ mapInc :: forall s g. IncBy g -> IncBy (Map s g)
 mapInc IZ = IZ
 mapInc (IS n) = IS (mapInc @s n)
 
-
-exchange :: forall t1 t2 a g. SubstDB a => Sub a (t1:t2:g) (t2:t1:g)
-exchange = var (S Z) :< var Z :< Inc (IS (IS IZ))
+-- exchange is renaming.
+-- Should Sub have renaming constructor?
+--
+-- exchange :: forall t1 t2 a g. SubstDB a => Sub a (t1:t2:g) (t2:t1:g)
+-- exchange = var (S Z) :< var Z :< Inc (IS (IS IZ))
 
 
 

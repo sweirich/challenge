@@ -23,7 +23,7 @@ import Imports
 -- to indicate the binding location of a variable.
 -- Morally this type is equivalent to "a (t1:g) t2", i.e. an 'a' of type
 -- t2 where the context 'g' has been extended with variable t1
-data Bind a t1 g t2 = forall g'. Bind (Sub a g' (t1:g)) (a g' t2)
+data Bind a t1 g t2 = forall g'. Bind (Sub a g' g) (a (t1:g') t2)
 
 -- | introduce a binder
 bind :: SubstDB a => a (t1:g) t2 -> Bind a t1 g t2
@@ -32,17 +32,17 @@ bind = Bind (Inc IZ)
 
 -- | expose the body of the binder
 unbind :: SubstDB a => Bind a t1 g t2 -> a (t1:g) t2
-unbind (Bind s a) = subst s a
+unbind (Bind s a) = subst (lift s) a
 {-# INLINABLE unbind #-}
 
 -- | replace the variable bound at the binder with a term
 instantiate :: SubstDB a => Bind a t1 g t2 -> a g t1 -> a g t2
-instantiate (Bind s a) b = subst (comp s (singleSub b)) a
+instantiate (Bind s a) b = subst (b :< s) a
 {-# INLINABLE instantiate #-}
 
 -- | substitute through the binder
 substBind :: SubstDB a => Sub a g1 g2 -> Bind a t1 g1 t2 -> Bind a t1 g2 t2
-substBind s2 (Bind s1 e) = Bind (comp s1 (lift s2)) e
+substBind s2 (Bind s1 e) = Bind (comp s1 s2) e
 {-# INLINABLE substBind #-}
 
 -- Substitution infrastructure ----------------

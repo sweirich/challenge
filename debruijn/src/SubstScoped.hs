@@ -33,35 +33,52 @@ instance Show (Idx n) where
 -- appear in the term.)
 -- Substitution takes terms from scope n to scope m 
 data Sub (a :: Nat -> Type) (n :: Nat) (m :: Nat) where
-    Inc   :: Sing m -> Sub a n (Plus m n)           --  increment by 1 (shift)                
+    Id    :: Sub a n n                              --  identity substitution
     (:<)  :: a m -> Sub a n m -> Sub a (S n) m      --  extend a substitution (like cons)
-    (:<>) :: Sub a m n -> Sub a n p -> Sub a m p    --  compose substitutions
+    Lift  :: Sub a n m -> Sub a (S n) (S m)         --  Used in Substitution when going under a binder
 
 infixr :<     -- like usual cons operator (:)
-infixr :<>    -- like usual composition  (.)
 
-instance C.Category (Sub a) where
-    id = nilSub
-    (.) = flip (:<>)
+comp :: SubstDB a => Sub a n m -> Sub a m p -> Sub a n p
+comp Id          s2         = s2
+comp (tm :< s1)  s2         = subst s2 tm :< comp s1 s2
+comp (Lift s1)   Id         = Lift s1
+comp (Lift s1)   (tm :< s2) = tm :< comp s1 s2
+comp (Lift s1)   (Lift s2)  = Lift (comp s1 s2)
+
+-- s1 :<> Id           = s1
+-- s1 :<> (tm :< s2)   = subst s1 tm :< (s1 :<> s2)
+-- Id :<> Lift s       = Lift s
+-- (tm :< s1) :<> s2   = tm :< (s1 :<> s2)
+-- Lift s1 :<> Lift s2 = Lift undefined
+
+
+instance SubstDB a => C.Category (Sub a) where
+    id  = nilSub
+    (.) = flip comp
 
 -- | Identity substitution, leaves all variables alone
 nilSub :: Sub a n n 
-nilSub = Inc SZ
+nilSub = Id
 
 -- | Increment, shifts all variables by one
-weakSub :: Sub a n (S n)
-weakSub = Inc (SS SZ)
+-- weakSub :: Sub a n (S n)
+-- weakSub = Inc (SS SZ)
 
 -- | Singleton, replace 0 with t, leave everything else alone
 singleSub :: a n -> Sub a (S n) n
 singleSub t = t :< nilSub
 
+-- | A renaming
+type Rename n m = Idx n -> Idx m
+
 -- | General class for terms that support substitution
 -- The var construction must bound the index by the scope for the term
 -- The subst operation changes the scope of an expression
 class SubstDB (a :: Nat -> Type) where
-   var   :: Idx n -> a n
-   subst :: Sub a n m -> a n -> a m
+   var    :: Idx n -> a n
+   subst  :: Sub a n m -> a n -> a m
+   rename :: Rename n m -> a n -> a m
 
 add :: Sing m -> Idx n -> Idx (Plus m n)
 add SZ x = x
@@ -69,25 +86,17 @@ add (SS m) x = FS (add m x)
 
 -- | Value of the index x in the substitution s
 applySub :: SubstDB a => Sub a n m -> Idx n -> a m
-applySub (Inc m)        x  = var (add m x)
-applySub (ty :< s)     FZ  = ty
+applySub Id         x      = var x
+applySub (ty :< s)  FZ     = ty
 applySub (ty :< s)  (FS x) = applySub s x
-applySub (s1 :<> s2)    x  = subst s2 (applySub s1 x)
+applySub (Lift s)   FZ     = var FZ
+applySub (Lift s)   (FS x) = rename FS (applySub s x)
+
+
+liftRename :: Rename n m -> Rename (S n) (S m)
+liftRename f FZ     = FZ
+liftRename f (FS x) = FS (f x)
 
 -- | Used in a substitution when going under a binder
 lift :: SubstDB a => Sub a n m -> Sub a (S n) (S m)
-lift s = var FZ :< (s :<> weakSub)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+lift = Lift

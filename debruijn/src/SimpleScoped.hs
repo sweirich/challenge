@@ -35,6 +35,11 @@ data Exp :: Nat -> Type where
 instance SubstDB Exp where
    var = VarE
 
+   rename f (IntE x)     = IntE x
+   rename f (VarE x)     = VarE (f x)
+   rename f (LamE ty e)  = LamE ty (rename (liftRename f) e)
+   rename f (AppE e1 e2) = AppE (rename f e1) (rename f e2)
+
    subst s (IntE x)     = IntE x
    subst s (VarE x)     = applySub s x
    subst s (LamE ty e)  = LamE ty (subst (lift s) e)

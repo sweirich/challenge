@@ -43,6 +43,13 @@ data Exp :: Nat -> Type where
 instance SubstDB Exp where
    var = VarE
 
+   rename s (IntE x)     = IntE x
+   rename s (VarE x)     = VarE (s x)
+   rename s (LamE ty e)  = LamE ty (rename (liftRename s) e)
+   rename s (AppE e1 e2) = AppE (rename s e1) (rename s e2)
+   rename s (TyLam e)    = TyLam (rename s e)  
+   rename s (TyApp e t)  = TyApp (rename s e) t
+
    subst s (IntE x)     = IntE x
    subst s (VarE x)     = applySub s x
    subst s (LamE ty e)  = LamE ty (subst (lift s) e)
@@ -63,9 +70,9 @@ substTy s (TyApp e t)  = TyApp (substTy s e) (W.subst s t)
 
 -- | Increment all types in an expression substitution
 incTy :: forall n m . Sub Exp n m -> Sub Exp n m 
-incTy (Inc x)     = Inc x
-incTy (e :< s1)   = substTy W.weakSub e :< incTy s1
-incTy (s1 :<> s2) = incTy s1 :<> incTy s2
+incTy Id        = Id
+incTy (e :< s1) = substTy W.weakSub e :< incTy s1
+incTy (Lift s)  = Lift (incTy s)
 
 
 -----------------------------------------------------------------------

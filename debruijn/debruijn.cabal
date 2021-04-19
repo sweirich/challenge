@@ -38,7 +38,7 @@ library
                        
   -- other-extensions:
   build-depends:       base >=4.13,
-                       singletons >= 2.6,
+                       singletons >= 2.6 && < 3.0,
                        QuickCheck >= 2.12,
                        Cabal
 

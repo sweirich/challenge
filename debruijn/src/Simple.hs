@@ -10,9 +10,12 @@ import Subst
 data Ty = IntTy | Ty :-> Ty
   deriving (Eq, Show)
 
+data Exp = IntE Int | VarE Idx | LamE Ty Exp | AppE Exp Exp
+  deriving (Eq, Show)
+
 -- Syntax of STLC expressions, using GADT syntax for comparison
 -- with later approaches
-
+{-}
 data Exp :: Type where
   IntE   :: Int      -- literal ints
          -> Exp
@@ -25,7 +28,7 @@ data Exp :: Type where
          -> Exp      -- argument
          -> Exp
      deriving (Eq, Show)
-
+--}
 instance SubstDB Exp where
    var = VarE
 
@@ -53,9 +56,12 @@ step (AppE e1 e2) = Just $ stepApp e1 e2 where
 -- | Big-step evaluation of closed terms
 -- To do this correctly, we need to define a separate type
 -- for values. 
+
 data Val :: Type where
   IntV :: Int -> Val
   LamV :: Ty -> Exp -> Val
+
+-- data Val = IntV Int | LamV Ty Exp
 
 eval :: Exp -> Val 
 eval (IntE x)     = IntV x
@@ -63,7 +69,7 @@ eval (VarE _)     = error "Unbound variable"
 eval (LamE t e)   = LamV t e
 eval (AppE e1 e2) =
   case eval e1 of
-    (IntV _) -> error "Type error"
+    (IntV _)     -> error "Type error"
     (LamV t e1') -> eval (subst (singleSub e2) e1')
     
                                
